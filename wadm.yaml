@@ -1,0 +1,55 @@
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: couchbase-demo
+  annotations:
+    version: v0.0.1
+    description: 'Couchbase capability provider demonstration with wasmCloud'
+spec:
+  components:
+    - name: counter
+      type: component
+      properties:
+        image: ghcr.io/wasmcloud/components/http-keyvalue-counter-rust:0.1.0
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 1
+        # Link the component to the provider on wasi-keyvalue
+        - type: link
+          properties:
+            target: couchbase
+            namespace: wasi
+            package: keyvalue
+            interfaces: [atomics, store]
+
+    - name: couchbase
+      type: capability
+      properties:
+        image: file://./build/wasmcloud-provider-couchbase.par.gz
+        id: couchbase
+        config:
+          - name: provider-config
+            properties:
+              username: 'Administrator'
+              password: 'password'
+              bucketName: 'test'
+              connectionString: 'localhost'
+    # Add a capability provider that enables HTTP access
+    - name: httpserver
+      type: capability
+      properties:
+        image: ghcr.io/wasmcloud/http-server:0.20.0
+      traits:
+        # Link the httpserver to the component, and configure the HTTP server
+        # to listen on port 8080 for incoming requests
+        - type: link
+          properties:
+            target: counter
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler]
+            source_config:
+              - name: default-http
+                properties:
+                  address: 127.0.0.1:8080
