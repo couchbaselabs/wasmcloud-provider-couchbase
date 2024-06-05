@@ -1,0 +1,23 @@
+name: wit
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: wit-deps-cli
+      - uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: wit-bindgen-cli
+      - name: fetch WIT dependencies
+        run: wit-deps
+      - name: Run wit-bindgen to test WIT
+        run: wit-bindgen rust --out-dir /tmp/wit wit/

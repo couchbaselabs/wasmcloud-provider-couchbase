@@ -5,4 +5,10 @@ world interfaces {
     export wrpc:keyvalue/atomics@0.2.0-draft;
     // TODO: support batch
     // export wrpc:keyvalue/batch@0.2.0-draft;
+
+    export wasmcloud:couchbase/document-crud@0.1.0-draft;
+    export wasmcloud:couchbase/fts@0.1.0-draft;
+    export wasmcloud:couchbase/subdocument-lookup@0.1.0-draft;
+    export wasmcloud:couchbase/subdocument-mutate@0.1.0-draft;
+    export wasmcloud:couchbase/sqlpp@0.1.0-draft;
 }

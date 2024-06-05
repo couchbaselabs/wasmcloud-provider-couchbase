@@ -1,1 +1,2 @@
-keyvalue = "../../host/wit/deps/keyvalue"
+keyvalue = "keyvalue"
+couchbase = "couchbase"
