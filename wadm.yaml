@@ -34,6 +34,8 @@ spec:
               username: 'Administrator'
               password: 'password'
               bucketName: 'test'
+              scope: "testscope"
+              collection: "testcollection"
               connectionString: 'localhost'
     # Add a capability provider that enables HTTP access
     - name: httpserver

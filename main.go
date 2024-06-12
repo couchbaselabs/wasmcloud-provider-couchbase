@@ -49,6 +49,8 @@ func run() error {
 	connectionString := p.HostData().Config["connectionString"]
 	username := p.HostData().Config["username"]
 	password := p.HostData().Config["password"]
+	scopeName := p.HostData().Config["scope"]
+	collectionName := p.HostData().Config["collection"]
 
 	cluster, err := gocb.Connect("couchbase://"+connectionString, gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
@@ -64,8 +66,9 @@ func run() error {
 	if err = bucket.WaitUntilReady(5*time.Second, nil); err != nil {
 		return err
 	}
+	scope := bucket.Scope(scopeName)
+	col := scope.Collection(collectionName)
 
-	col := bucket.DefaultCollection()
 	providerHandler.collection = col
 	// couchbase setup end
 
