@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	errNoSuchStore     = store.NewError_NoSuchStore()
-	errInvalidDataType = store.NewError_Other("invalid data type stored in map")
+	errNoSuchStore     = store.NewErrorNoSuchStore()
+	errInvalidDataType = store.NewErrorOther("invalid data type stored in map")
 )
 
 // This provider `Handler` stores a global collection for querying.
@@ -79,7 +79,7 @@ func (h *Handler) Exists(ctx context.Context, bucket string, key string) (*wrpc.
 
 func (h *Handler) ListKeys(ctx context.Context, bucket string, cursor *uint64) (*wrpc.Result[store.KeyResponse, store.Error], error) {
 	h.Logger.Warn("received request to list keys")
-	return wrpc.Err[store.KeyResponse](*store.NewError_Other("list-keys operation not supported")), nil
+	return wrpc.Err[store.KeyResponse](*store.NewErrorOther("list-keys operation not supported")), nil
 }
 
 // Implementation of wasi:keyvalue/atomics
