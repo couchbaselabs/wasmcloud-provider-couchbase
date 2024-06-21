@@ -63,7 +63,7 @@ interface types {
   record collection {
     /// Bucket the collection belongs to
     bucket: bucket-name,
-    /// Scope of the collection (ex. "_default")
+    /// Scope of the collection (ex. "_default" if not specified)
     scope: option<string>,
     /// Name of the collection (which may be a simple name, if only this value is specified)
     name: collection-name,

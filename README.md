@@ -34,3 +34,13 @@ Then you can test the increment functionality with cURL:
 ```shell
 curl localhost:8080/couchbase
 ```
+
+## Test
+
+To test the WIT bindings, download [`wit-bindgen`][wit-bindgen] and run the following:
+
+```console
+wit-deps && wit-bindgen rust --out-dir /tmp/wit wit/
+```
+
+This will attempt to generate Rust based bindings, in a folder under `/tmp` (which will be cleaned up eventually), but in doing so, will check that the WIT definitions are valid (as they must be to complete binding generation).

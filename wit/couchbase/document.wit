@@ -3,7 +3,7 @@ package wasmcloud:couchbase@0.1.0-draft;
 /// Support CRUD access and modification of Documents stored in a Couchbase cluster.
 ///
 /// Reference: https://docs.couchbase.com/c-sdk/current/concept-docs/documents.html
-interface document-crud {
+interface document {
   use types.{
       document, document-id, document-error, mutation-metadata, time, durability-level, retry-strategy, request-span,
       replica-read-level
@@ -239,4 +239,109 @@ interface document-crud {
     id: document-id,
     options: option<document-remove-options>,
   ) -> result<mutation-metadata, document-error>;
+
+  ///////////////////////////////
+  /// Document - Get and Lock ///
+  ///////////////////////////////
+
+  /// Options for performing a document lock
+  record document-get-and-lock-options {
+    /// Amount of time to lock the document (nanoseconds)
+    lock-time: u64,
+
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+
+
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Retrieve and Lock a document by ID
+  get-and-lock: func(
+    id: document-id,
+    options: option<document-get-and-lock-options>,
+  ) -> result<document-get-result, document-error>;
+
+  /////////////////////////
+  /// Document - Unlock ///
+  /////////////////////////
+
+  /// Options for performing a document lock
+  record document-unlock-options {
+    /// CAS revision of the document
+    revision: u64,
+
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Retrieve and Lock a document by ID
+  unlock: func(
+    id: document-id,
+    options: option<document-unlock-options>,
+  ) -> result<_, document-error>;
+
+  ////////////////////////
+  /// Document - Touch ///
+  ////////////////////////
+
+  /// Options for performing a document lock
+  record document-touch-options {
+    /// Time until the document expires (nanoseconds)
+    expires-in: u64,
+
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Retrieve and Lock a document by ID
+  touch: func(
+    id: document-id,
+    options: option<document-touch-options>,
+  ) -> result<mutation-metadata, document-error>;
+
+  ////////////////////////////////
+  /// Document - Get and Touch ///
+  ////////////////////////////////
+
+  /// Options for performing a document touch
+  record document-get-and-touch-options {
+    /// Time until the document expires (nanoseconds)
+    expires-in: u64,
+
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Retrieve and Touch a document by ID
+  get-and-touch: func(
+    id: document-id,
+    options: option<document-get-and-touch-options>,
+  ) -> result<document-get-result, document-error>;
 }
