@@ -222,7 +222,7 @@ interface subdocument-mutate {
     timeout-ns: u64,
 
     /// CAS revision of the document
-    revision: u64,
+    cas: u64,
 
     /// Durability level for the mutation
     ///
@@ -265,7 +265,7 @@ interface subdocument-mutate {
   /// does not currently correctly pull the definition in the types interface.
   record mutation-metadata {
     /// CAS revision of the document
-    revision: u64,
+    cas: u64,
     /// The bucket on which the mutation was performed
     bucket: string,
     /// The ID of the vbucket (partition) that the operation was performed on

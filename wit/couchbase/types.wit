@@ -146,7 +146,7 @@ interface types {
   /// Metadata related to any mutation on a Couchbase collection (ex. CRUD operations)
   record mutation-metadata {
     /// CAS revision of the document
-    revision: u64,
+    cas: u64,
     /// The bucket on which the mutation was performed
     bucket: string,
     /// The ID of the vbucket (partition) that the operation was performed on
@@ -196,6 +196,12 @@ interface types {
     phases,
     /// Include timing profiling informatoin in the query response
     timings,
+  }
+
+  /// Level of data consistency required for a search
+  enum search-scan-consistency {
+    /// No data consistency required
+    not-bounded,
   }
 
   /// Individual mutation token

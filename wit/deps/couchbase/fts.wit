@@ -12,7 +12,8 @@ package wasmcloud:couchbase@0.1.0-draft;
 interface fts {
   use types.{
     request-span, document, document-field-name, collection, sort-direction, 
-    bucket-error, search-index-name, retry-strategy, mutation-state
+    bucket-error, search-index-name, retry-strategy, mutation-state,
+    search-scan-consistency
     };
 
   variant fts-bucket-error {
@@ -59,13 +60,29 @@ interface fts {
     date-range(tuple<string, string, string>),
   }
 
+  /// The type of highlighting to use for a query
+  enum search-highlight-style {
+    default,
+    /// Use HTML tags
+    html,
+    /// Use ANSI tags
+    ansi,
+  }
+
+  record search-highlight-options {
+    /// Style of highlighting to use for the query
+    style: search-highlight-style,
+    /// Fields to highlight
+    fields: list<string>,
+  }
+
   /// Options to use when performing a search
   record search-options {
     /// Number of results to limit the search results by
     limit: u32,
 
     /// Level of data consistency desired for a search query
-    scan-consistency: u64,
+    scan-consistency: search-scan-consistency,
 
     /// Number of results to skip
     skip: u32,
@@ -74,7 +91,7 @@ interface fts {
     explain: bool,
 
     /// Enable highlighting on the search
-    highlight: bool,
+    highlight: option<search-highlight-options>,
 
     /// Fields on documents in which to search
     fields: list<document-field-name>,
