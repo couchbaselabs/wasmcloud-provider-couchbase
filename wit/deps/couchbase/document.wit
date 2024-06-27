@@ -60,7 +60,7 @@ interface document {
   /// Options for performing a document replace
   record document-replace-options {
     /// CAS revision of the document
-    revision: u64,
+    cas: u64,
 
     /// When the document should expire (nanoseconds)
     expires-in-ns: u64,
@@ -183,7 +183,7 @@ interface document {
     document: document,
 
     /// CAS revision of the document
-    revision: u64,
+    cas: u64,
 
     /// Time when the document expires
     ///
@@ -204,7 +204,7 @@ interface document {
   /// Options for performing a document remove
   record document-remove-options {
     /// CAS revision of the document
-    revision: u64,
+    cas: u64,
 
     /// (Deprecated)
     /// Traditional durability settings for persistence, only usable from Couchbase versions earlier than 6.0
@@ -274,7 +274,7 @@ interface document {
   /// Options for performing a document lock
   record document-unlock-options {
     /// CAS revision of the document
-    revision: u64,
+    cas: u64,
 
     /// Timeout that should be used, in nanoseconds
     /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
