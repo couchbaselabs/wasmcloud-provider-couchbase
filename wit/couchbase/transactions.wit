@@ -59,7 +59,7 @@ interface transactions {
   /// Replace a document, inside a transaction
   tx-document-replace: func(
     tx: tx-token,
-    old: document,
+    old: document-get-result,
     new: document,
   ) -> result<document-get-result, tx-error>;
 
