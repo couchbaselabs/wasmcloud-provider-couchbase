@@ -46,6 +46,15 @@ interface subdocument-lookup {
     parent-span: option<request-span>,
   }
 
+  /// Documents that are returned from lookup-in operations
+  record lookup-in-document {
+    /// CAS revision of the document
+    cas: u64,
+
+    /// Value that was retrieved
+    document: document,
+  }
+
   /// Documents that are returned from lookup-in operations on replicas
   record lookup-in-replica-document {
     /// CAS revision of the document
@@ -75,7 +84,7 @@ interface subdocument-lookup {
     id: document-id,
     operations: list<lookup-operation>,
     options: lookup-options,
-  ) -> result<list<result<document, subdocument-lookup-error>>, lookup-error>;
+  ) -> result<list<result<lookup-in-document, subdocument-lookup-error>>, lookup-error>;
 
   /// Perform a lookup on a particular document from any replica server
   lookup-in-any-replicas: func(
