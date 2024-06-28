@@ -46,6 +46,18 @@ interface subdocument-lookup {
     parent-span: option<request-span>,
   }
 
+  /// Documents that are returned from lookup-in operations on replicas
+  record lookup-in-replica-document {
+    /// CAS revision of the document
+    cas: u64,
+
+    /// Whether this document came from a replica server
+    is-replica: bool,
+
+    /// Value that was retrieved
+    document: document,
+  }
+
   /// Errors that occur during lookup for an individual subdocument path
   variant subdocument-lookup-error {
     /// The provided path does not exist in the document
@@ -70,14 +82,14 @@ interface subdocument-lookup {
     id: document-id,
     operations: list<lookup-operation>,
     options: lookup-options,
-  ) -> result<list<result<document, subdocument-lookup-error>>, lookup-error>;
+  ) -> result<list<result<lookup-in-replica-document, subdocument-lookup-error>>, lookup-error>;
 
   /// Perform a lookup on a particular document from all replica servers
   lookup-in-all-replicas: func(
     id: document-id,
     operations: list<lookup-operation>,
     options: lookup-options,
-  ) -> result<list<result<document, subdocument-lookup-error>>, lookup-error>;
+  ) -> result<list<list<result<lookup-in-replica-document, subdocument-lookup-error>>>, lookup-error>;
 }
 
 /// Perform sub-document mutation operations on Documents stored in a Couchbase cluster
