@@ -177,6 +177,32 @@ interface document {
     parent-span: option<request-span>,
   }
 
+  /// Options for retrieving a document from any replica
+  record document-get-any-replica-options {
+    /// Timeout that should be used, in nanoseconds
+    /// If not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Options for retrieving a document from any replica
+  record document-get-all-replica-options {
+    /// Timeout that should be used, in nanoseconds
+    /// If not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
   /// Result of a successfully executed document get
   record document-get-result {
     /// Document that was retrieved
@@ -184,6 +210,33 @@ interface document {
 
     /// CAS revision of the document
     cas: u64,
+
+    /// When the document should expire (nanoseconds)
+    ///
+    /// Deprecated: use expires-at instead
+    expires-in-ns: option<u64>,
+
+    /// Time when the document expires
+    ///
+    /// This field may not be present if `document-get-options.with-expiry` is not set
+    expires-at: option<time>,
+  }
+
+  /// Result from a replica-aware document get
+  record document-get-replica-result {
+    /// Whether this document came from a replica server
+    is-replica: bool,
+
+    /// CAS revision of the document
+    cas: u64,
+
+    /// Document that was retrieved
+    document: document,
+
+    /// When the document should expire (nanoseconds)
+    ///
+    /// Deprecated: use expires-at instead
+    expires-in-ns: option<u64>,
 
     /// Time when the document expires
     ///
@@ -196,6 +249,18 @@ interface document {
     id: document-id,
     options: option<document-get-options>,
   ) -> result<document-get-result, document-error>;
+
+  /// Retrieve a document by ID from any replica
+  get-any-repliacs: func(
+    id: document-id,
+    options: option<document-get-any-replica-options>,
+  ) -> result<document-get-replica-result, document-error>;
+
+  /// Retrieve a document by ID from all replicas
+  get-all-replicas: func(
+    id: document-id,
+    options: option<document-get-all-replica-options>,
+  ) -> result<list<document-get-replica-result>, document-error>;
 
   /////////////////////////
   /// Document - Remove ///

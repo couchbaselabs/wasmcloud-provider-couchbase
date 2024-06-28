@@ -64,6 +64,20 @@ interface subdocument-lookup {
     operations: list<lookup-operation>,
     options: lookup-options,
   ) -> result<list<result<document, subdocument-lookup-error>>, lookup-error>;
+
+  /// Perform a lookup on a particular document from any replica server
+  lookup-in-any-replicas: func(
+    id: document-id,
+    operations: list<lookup-operation>,
+    options: lookup-options,
+  ) -> result<list<result<document, subdocument-lookup-error>>, lookup-error>;
+
+  /// Perform a lookup on a particular document from all replica servers
+  lookup-in-all-replicas: func(
+    id: document-id,
+    operations: list<lookup-operation>,
+    options: lookup-options,
+  ) -> result<list<result<document, subdocument-lookup-error>>, lookup-error>;
 }
 
 /// Perform sub-document mutation operations on Documents stored in a Couchbase cluster
