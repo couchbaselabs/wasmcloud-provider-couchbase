@@ -20,4 +20,4 @@ jobs:
       - name: fetch WIT dependencies
         run: wit-deps
       - name: Run wit-bindgen to test WIT
-        run: wit-bindgen rust --out-dir /tmp/wit wit/
+        run: wit-bindgen markdown --out-dir /tmp wit/
