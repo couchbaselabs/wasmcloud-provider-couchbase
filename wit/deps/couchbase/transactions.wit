@@ -8,9 +8,8 @@ package wasmcloud:couchbase@0.1.0-draft;
 interface transactions {
   use types.{
     document-id, request-span, document, subdocument-path, document-error, retry-strategy, mutation-metadata,
-    query-scan-consistency, query-profile-mode, collection
+    query-scan-consistency, query-profile-mode, collection, time
   };
-  use document.{document-get-result};
   use sqlpp.{sqlpp-value, sqlpp-query-status, sqlpp-query-metrics, sqlpp-query-warning};
 
   /// A token representing a transaction (pseudo resource)
@@ -42,31 +41,56 @@ interface transactions {
     unexpected(string),
   }
 
+  /// Result of a successfully executed document get
+  record tx-document-get-result {
+    /// Document that was retrieved
+    document: document,
+
+    /// CAS revision of the document
+    cas: u64,
+
+    /// When the document should expire (nanoseconds)
+    ///
+    /// Deprecated: use expires-at instead
+    expires-in-ns: option<u64>,
+
+    /// Time when the document expires
+    ///
+    /// This field may not be present if `document-get-options.with-expiry` is not set
+    expires-at: option<time>,
+
+    /// ID for metadata related to the operation
+    ///
+    /// This ID is provided by and used by the implementer to manage in-tx metadata,
+    /// and should not be manipulated by callers but rather passed verbatim.
+    tx-metadata-id: string,
+  }
+
   /// Retrieve a document, inside a transaction
   tx-document-get: func(
     tx: tx-token,
     collection: collection,
     id: document-id
-  ) -> result<document-get-result, tx-error>;
+  ) -> result<tx-document-get-result, tx-error>;
 
   /// Insert a document, inside a transaction
   tx-document-insert: func(
     tx: tx-token,
     id: document-id,
     document: document,
-  ) -> result<document-get-result, tx-error>;
+  ) -> result<tx-document-get-result, tx-error>;
 
   /// Replace a document, inside a transaction
   tx-document-replace: func(
     tx: tx-token,
-    old: document-get-result,
+    old: tx-document-get-result,
     new: document,
-  ) -> result<document-get-result, tx-error>;
+  ) -> result<tx-document-get-result, tx-error>;
 
   /// Remove a document, inside a transaction
   tx-document-remove: func(
     tx: tx-token,
-    doc: document,
+    doc: tx-document-get-result,
   ) -> result<_, tx-error>;
 
   /// Options to perform a query inside a transaction
