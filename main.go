@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase/gocb/v2"
@@ -22,7 +21,10 @@ func main() {
 
 func run() error {
 	// Initialize the provider with callbacks to track linked components
-	providerHandler := Handler{}
+	providerHandler := Handler{
+		linkedFrom:         make(map[string]map[string]string),
+		clusterConnections: make(map[string]*gocb.Collection),
+	}
 	p, err := provider.New(
 		provider.TargetLinkPut(func(link provider.InterfaceLinkDefinition) error {
 			return handleNewTargetLink(&providerHandler, link)
@@ -43,31 +45,6 @@ func run() error {
 
 	// Store the provider for use in the handlers
 	providerHandler.WasmcloudProvider = p
-
-	// couchbase setup start
-	bucketName := p.HostData().Config["bucketName"]
-	connectionString := p.HostData().Config["connectionString"]
-	username := p.HostData().Config["username"]
-	password := p.HostData().Config["password"]
-
-	cluster, err := gocb.Connect("couchbase://"+connectionString, gocb.ClusterOptions{
-		Authenticator: gocb.PasswordAuthenticator{
-			Username: username,
-			Password: password,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	bucket := cluster.Bucket(bucketName)
-	if err = bucket.WaitUntilReady(5*time.Second, nil); err != nil {
-		return err
-	}
-
-	col := bucket.DefaultCollection()
-	providerHandler.collection = col
-	// couchbase setup end
 
 	// Setup two channels to await RPC and control interface operations
 	providerCh := make(chan error, 1)
@@ -98,19 +75,19 @@ func run() error {
 		p.Shutdown()
 		stopFunc()
 	}
-
 	return nil
 }
 
 func handleNewTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	// handler.Logger.Info("Handling new target link", "link", link)
-	// handler.linkedFrom[link.Target] = link.TargetConfig
+	handler.Logger.Info("Handling new target link", "link", link)
+	handler.linkedFrom[link.SourceID] = link.TargetConfig
+	handler.updateCouchbaseCluster(handler, link.SourceID, link.TargetConfig)
 	return nil
 }
 
 func handleDelTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	// handler.Logger.Info("Handling del target link", "link", link)
-	// delete(handler.linkedFrom, link.Target)
+	handler.Logger.Info("Handling del target link", "link", link)
+	delete(handler.linkedFrom, link.Target)
 	return nil
 }
 

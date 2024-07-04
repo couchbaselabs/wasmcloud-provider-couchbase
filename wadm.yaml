@@ -22,7 +22,14 @@ spec:
             namespace: wasi
             package: keyvalue
             interfaces: [atomics, store]
-
+            target_config:
+              - name: provider-config
+                properties:
+                  username: 'Administrator'
+                  password: 'password'
+                  bucketName: 'test'
+                  connectionString: 'localhost'
+                  scopeName: 'test'
     - name: couchbase
       type: capability
       properties:

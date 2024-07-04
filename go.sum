@@ -78,6 +78,8 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/wasmCloud/provider-sdk-go v0.0.0-20240603160107-53fab4f0d660 h1:W47MTq7z2MKpydilhyNqhuIfiGB4oo2pLF21M7CCWyY=
 github.com/wasmCloud/provider-sdk-go v0.0.0-20240603160107-53fab4f0d660/go.mod h1:DZRTpRkX3YluIs+FKcx157XbQa1q4rFRDpxbamZZBc0=
+github.com/wasmCloud/provider-sdk-go v0.0.0-20240626135506-00b1fb3dec9e h1:UIK1VDU1hwvGTd4S9pokw/IoY0ChIhYldWB44JnWuD8=
+github.com/wasmCloud/provider-sdk-go v0.0.0-20240626135506-00b1fb3dec9e/go.mod h1:DZRTpRkX3YluIs+FKcx157XbQa1q4rFRDpxbamZZBc0=
 github.com/wrpc/wrpc/go v0.0.0-20240619071643-b830439e40d6 h1:P2X0Tsw8o45TmBZbST5vRguBjK80e7QJ9TX/fh/8l2U=
 github.com/wrpc/wrpc/go v0.0.0-20240619071643-b830439e40d6/go.mod h1:xbr40Iv8kVVnQHnHzmdbtaxOvyRZLb7y3c90vrGGcxo=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
