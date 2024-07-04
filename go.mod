@@ -4,7 +4,7 @@ go 1.22.3
 
 require (
 	github.com/couchbase/gocb/v2 v2.8.1
-	github.com/wasmCloud/provider-sdk-go v0.0.0-20240603160107-53fab4f0d660
+	github.com/wasmCloud/provider-sdk-go v0.0.0-20240626135506-00b1fb3dec9e
 	github.com/wrpc/wrpc/go v0.0.0-20240619071643-b830439e40d6
 )
 

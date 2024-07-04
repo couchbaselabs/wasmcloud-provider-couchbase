@@ -1,0 +1,31 @@
+version: '3.7'
+
+services:
+  couchbase:
+    image: couchbase:latest
+    ports:
+      - 8091:8091
+      - 8092:8092
+      - 8093:8093
+      - 8094:8094
+      - 11210:11210
+      - 11207:11207
+      - 11211:11211
+    environment:
+      - COUCHBASE_ADMINISTRATOR_USERNAME=Administrator
+      - COUCHBASE_ADMINISTRATOR_PASSWORD=password
+      - COUCHBASE_BUCKET=test
+      - COUCHBASE_CONNECTION_STRING=localhost
+    volumes:
+      - couchbase-data:/opt/couchbase/var
+  
+  couchbase-init:
+    image: couchbase:latest
+    depends_on:
+      - couchbase
+    volumes:
+      - ./init-couchbase.sh:/init-couchbase.sh
+    entrypoint: "/init-couchbase.sh"
+    
+volumes:
+  couchbase-data:
