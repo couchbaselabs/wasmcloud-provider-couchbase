@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
 	"os/signal"
@@ -81,7 +82,28 @@ func run() error {
 func handleNewTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
 	handler.Logger.Info("Handling new target link", "link", link)
 	handler.linkedFrom[link.SourceID] = link.TargetConfig
+	err := ValidateCouchbaseConfig(link.TargetConfig)
+	if err != nil {
+		handler.Logger.Error("Invalid couchbase target config", "error", err)
+		return err
+	}
 	handler.updateCouchbaseCluster(handler, link.SourceID, link.TargetConfig)
+	return nil
+}
+
+func ValidateCouchbaseConfig(config map[string]string) error {
+	if config["username"] == "" {
+		return errors.New("username is required")
+	}
+	if config["password"] == "" {
+		return errors.New("password is required")
+	}
+	if config["bucket"] == "" {
+		return errors.New("bucket is required")
+	}
+	if config["host"] == "" {
+		return errors.New("host is required")
+	}
 	return nil
 }
 
