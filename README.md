@@ -22,7 +22,9 @@ Prerequisites:
 
 - [wash 0.29](https://wasmcloud.com/docs/installation) or later
 - A built couchbase capability provider, see [#build](#build)
-- Couchbase server as setup in the [Quick Install](https://docs.couchbase.com/server/current/getting-started/do-a-quick-install.html) guide with a bucket named **test** created.
+- Couchbase server setup using the docker-compose in the repo and just run `docker-compose up -d` to start a Couchbase server with the required setup.
+  .Alternatively, you can use [Quick Install](https://docs.couchbase.com/server/current/getting-started/do-a-quick-install.html) guide with a bucket named **test** created
+ 
 
 ```shell
 wash up -d
