@@ -3,15 +3,21 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase/gocb/v2"
 	"github.com/wasmCloud/provider-sdk-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
@@ -21,11 +27,26 @@ func main() {
 }
 
 func run() error {
+	// Handle SIGINT (CTRL+C) gracefully.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	// Set up OpenTelemetry.
+	otelShutdown, err := setupOTelSDK(ctx)
+	if err != nil {
+		return err
+	}
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+	}()
+
 	// Initialize the provider with callbacks to track linked components
 	providerHandler := Handler{
 		linkedFrom:         make(map[string]map[string]string),
 		clusterConnections: make(map[string]*gocb.Collection),
 	}
+
 	p, err := provider.New(
 		provider.TargetLinkPut(func(link provider.InterfaceLinkDefinition) error {
 			return handleNewTargetLink(&providerHandler, link)
@@ -122,4 +143,64 @@ func handleShutdown(handler *Handler) error {
 	handler.Logger.Info("Handling shutdown")
 	// clear(handler.linkedFrom)
 	return nil
+}
+
+// setupOTelSDK bootstraps the OpenTelemetry pipeline.
+// If it does not return an error, make sure to call shutdown for proper cleanup.
+func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
+	var shutdownFuncs []func(context.Context) error
+
+	// shutdown calls cleanup functions registered via shutdownFuncs.
+	// The errors from the calls are joined.
+	// Each registered cleanup will be invoked once.
+	shutdown = func(ctx context.Context) error {
+		var err error
+		for _, fn := range shutdownFuncs {
+			err = errors.Join(err, fn(ctx))
+		}
+		shutdownFuncs = nil
+		return err
+	}
+
+	// handleErr calls shutdown for cleanup and makes sure that all errors are returned.
+	handleErr := func(inErr error) {
+		err = errors.Join(inErr, shutdown(ctx))
+	}
+
+	// Set up propagator.
+	prop := newPropagator()
+	otel.SetTextMapPropagator(prop)
+
+	// Set up trace provider.
+	tracerProvider, err := newTraceProvider()
+	if err != nil {
+		handleErr(err)
+		return
+	}
+	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
+	otel.SetTracerProvider(tracerProvider)
+
+	return
+}
+
+func newPropagator() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+}
+
+func newTraceProvider() (*trace.TracerProvider, error) {
+	traceExporter, err := stdouttrace.New(
+		stdouttrace.WithPrettyPrint())
+	if err != nil {
+		return nil, err
+	}
+
+	traceProvider := trace.NewTracerProvider(
+		trace.WithBatcher(traceExporter,
+			// Default is 5s. Set to 1s for demonstrative purposes.
+			trace.WithBatchTimeout(time.Second)),
+	)
+	return traceProvider, nil
 }

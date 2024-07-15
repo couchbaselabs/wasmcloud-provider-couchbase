@@ -9,15 +9,19 @@ import (
 	sdk "github.com/wasmCloud/provider-sdk-go"
 	wrpc "github.com/wrpc/wrpc/go"
 	wrpcnats "github.com/wrpc/wrpc/go/nats"
+	"go.opentelemetry.io/otel"
 
 	// Generated bindings
 	"github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings/exports/wrpc/keyvalue/atomics"
 	"github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings/exports/wrpc/keyvalue/store"
 )
 
+const name = "wasmcloud-provider-couchbase"
+
 var (
 	errNoSuchStore     = store.NewErrorNoSuchStore()
 	errInvalidDataType = store.NewErrorOther("invalid data type stored in map")
+	tracer             = otel.Tracer(name)
 )
 
 // This provider `Handler` stores a global collection for querying.
@@ -35,6 +39,8 @@ type Handler struct {
 // Implementation of wasi:keyvalue/store
 
 func (h *Handler) Get(ctx context.Context, bucket string, key string) (*wrpc.Result[[]uint8, store.Error], error) {
+	ctx, span := tracer.Start(ctx, "GET")
+	defer span.End()
 	h.Logger.Debug("received request to get value", "key", key)
 	collection, err := h.getCollectionFromContext(ctx)
 	res, err := collection.Get(key, &gocb.GetOptions{Transcoder: gocb.NewRawJSONTranscoder()})
@@ -68,6 +74,8 @@ func (h *Handler) getCollectionFromContext(ctx context.Context) (*gocb.Collectio
 }
 
 func (h *Handler) Set(ctx context.Context, bucket string, key string, value []uint8) (*wrpc.Result[struct{}, store.Error], error) {
+	ctx, span := tracer.Start(ctx, "SET")
+	defer span.End()
 	h.Logger.Debug("received request to set value", "key", key)
 	collection, err := h.getCollectionFromContext(ctx)
 	_, err = collection.Upsert(key, &value, &gocb.UpsertOptions{Transcoder: gocb.NewRawJSONTranscoder()})
@@ -79,6 +87,8 @@ func (h *Handler) Set(ctx context.Context, bucket string, key string, value []ui
 }
 
 func (h *Handler) Delete(ctx context.Context, bucket string, key string) (*wrpc.Result[struct{}, store.Error], error) {
+	ctx, span := tracer.Start(ctx, "DELETE")
+	defer span.End()
 	h.Logger.Debug("received request to delete value", "key", key)
 	collection, err := h.getCollectionFromContext(ctx)
 	_, err = collection.Remove(key, nil)
@@ -90,6 +100,8 @@ func (h *Handler) Delete(ctx context.Context, bucket string, key string) (*wrpc.
 }
 
 func (h *Handler) Exists(ctx context.Context, bucket string, key string) (*wrpc.Result[bool, store.Error], error) {
+	ctx, span := tracer.Start(ctx, "EXISTS")
+	defer span.End()
 	h.Logger.Debug("received request to check value existence", "key", key)
 	collection, err := h.getCollectionFromContext(ctx)
 	res, err := collection.Exists(key, nil)
@@ -107,6 +119,8 @@ func (h *Handler) ListKeys(ctx context.Context, bucket string, cursor *uint64) (
 
 // Implementation of wasi:keyvalue/atomics
 func (h *Handler) Increment(ctx context.Context, bucket string, key string, delta uint64) (*wrpc.Result[uint64, atomics.Error], error) {
+	ctx, span := tracer.Start(ctx, "INCREMENT")
+	defer span.End()
 	h.Logger.Debug("received request to increment key by delta", "key", key, "delta", delta)
 	collection, err := h.getCollectionFromContext(ctx)
 	res, err := collection.Binary().Increment(key, &gocb.IncrementOptions{Initial: int64(delta), Delta: delta})
