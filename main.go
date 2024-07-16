@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,16 +16,48 @@ import (
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase/gocb/v2"
 	"github.com/wasmCloud/provider-sdk-go"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
+
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		w.WriteHeader(http.StatusOK)
+		log.Default().Println("Health check successful")
+		// span.AddEvent("Health check successful")
+	} else {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Default().Println("Health check failed")
+		// span.AddEvent("Health check failed")
+	}
+}
 
 func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func newHTTPHandler() http.Handler {
+	mux := http.NewServeMux()
+	handleFunc := func(pattern string, handlerFunc func(http.ResponseWriter, *http.Request)) {
+		handler := otelhttp.WithRouteTag(pattern, http.HandlerFunc(handlerFunc))
+		mux.Handle(pattern, handler)
+	}
+
+	// Register handler for healthcheck.
+	handleFunc("/health", healthCheckHandler)
+
+	// Add HTTP instrumentation for the whole server.
+	handler := otelhttp.NewHandler(mux, "/")
+	return handler
 }
 
 func run() error {
@@ -40,6 +74,19 @@ func run() error {
 	defer func() {
 		err = errors.Join(err, otelShutdown(context.Background()))
 	}()
+
+	// Start HTTP server.
+	srv := &http.Server{
+		Addr:         ":8080",
+		BaseContext:  func(_ net.Listener) context.Context { return ctx },
+		ReadTimeout:  time.Second,
+		WriteTimeout: 10 * time.Second,
+		Handler:      newHTTPHandler(),
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		return err
+	}
 
 	// Initialize the provider with callbacks to track linked components
 	providerHandler := Handler{
@@ -145,8 +192,6 @@ func handleShutdown(handler *Handler) error {
 	return nil
 }
 
-// setupOTelSDK bootstraps the OpenTelemetry pipeline.
-// If it does not return an error, make sure to call shutdown for proper cleanup.
 func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
 	var shutdownFuncs []func(context.Context) error
 
@@ -183,16 +228,21 @@ func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	return
 }
 
-func newPropagator() propagation.TextMapPropagator {
-	return propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
+func newExporter(ctx context.Context) (*otlptrace.Exporter, error) {
+
+	exporter, err := otlptrace.New(
+		context.Background(),
+		otlptracehttp.NewClient(
+			otlptracehttp.WithEndpoint("localhost:4318"),
+
+			otlptracehttp.WithInsecure(),
+		),
 	)
+	return exporter, err
 }
 
 func newTraceProvider() (*trace.TracerProvider, error) {
-	traceExporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint())
+	traceExporter, err := newExporter(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +251,16 @@ func newTraceProvider() (*trace.TracerProvider, error) {
 		trace.WithBatcher(traceExporter,
 			// Default is 5s. Set to 1s for demonstrative purposes.
 			trace.WithBatchTimeout(time.Second)),
-	)
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("couchbase-provider"),
+		)))
 	return traceProvider, nil
+}
+
+func newPropagator() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
 }
