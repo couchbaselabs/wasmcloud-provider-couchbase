@@ -27,8 +27,8 @@ import (
 )
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	traceProvider := otel.GetTracerProvider()
-	tracer := traceProvider.Tracer("healthcheck")
+	// traceProvider := otel.GetTracerProvider()
+	// tracer := traceProvider.Tracer("healthcheck")
 	_, span := tracer.Start(r.Context(), "healthcheck")
 	defer span.End()
 	if r.Method == http.MethodGet {
@@ -211,6 +211,8 @@ func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	}
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
+	traceProvider := otel.GetTracerProvider()
+	tracer = traceProvider.Tracer(TRACER_NAME)
 
 	return
 }
