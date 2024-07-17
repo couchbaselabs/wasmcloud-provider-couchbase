@@ -16,7 +16,6 @@ import (
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase/gocb/v2"
 	"github.com/wasmCloud/provider-sdk-go"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -28,14 +27,18 @@ import (
 )
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	traceProvider := otel.GetTracerProvider()
+	tracer := traceProvider.Tracer("healthcheck")
+	_, span := tracer.Start(r.Context(), "healthcheck")
+	defer span.End()
 	if r.Method == http.MethodGet {
 		w.WriteHeader(http.StatusOK)
 		log.Default().Println("Health check successful")
-		// span.AddEvent("Health check successful")
+		span.AddEvent("Health check successful")
 	} else {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		log.Default().Println("Health check failed")
-		// span.AddEvent("Health check failed")
+		span.AddEvent("Health check failed")
 	}
 }
 
@@ -43,21 +46,6 @@ func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func newHTTPHandler() http.Handler {
-	mux := http.NewServeMux()
-	handleFunc := func(pattern string, handlerFunc func(http.ResponseWriter, *http.Request)) {
-		handler := otelhttp.WithRouteTag(pattern, http.HandlerFunc(handlerFunc))
-		mux.Handle(pattern, handler)
-	}
-
-	// Register handler for healthcheck.
-	handleFunc("/health", healthCheckHandler)
-
-	// Add HTTP instrumentation for the whole server.
-	handler := otelhttp.NewHandler(mux, "/")
-	return handler
 }
 
 func run() error {
@@ -75,13 +63,12 @@ func run() error {
 		err = errors.Join(err, otelShutdown(context.Background()))
 	}()
 
-	// Start HTTP server.
+	http.HandleFunc("/health", healthCheckHandler)
 	srv := &http.Server{
-		Addr:         ":8080",
+		Addr:         ":8085",
 		BaseContext:  func(_ net.Listener) context.Context { return ctx },
 		ReadTimeout:  time.Second,
 		WriteTimeout: 10 * time.Second,
-		Handler:      newHTTPHandler(),
 	}
 
 	if err := srv.ListenAndServe(); err != nil {
