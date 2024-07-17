@@ -6,8 +6,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,22 +23,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
-
-func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	// traceProvider := otel.GetTracerProvider()
-	// tracer := traceProvider.Tracer("healthcheck")
-	_, span := tracer.Start(r.Context(), "healthcheck")
-	defer span.End()
-	if r.Method == http.MethodGet {
-		w.WriteHeader(http.StatusOK)
-		log.Default().Println("Health check successful")
-		span.AddEvent("Health check successful")
-	} else {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		log.Default().Println("Health check failed")
-		span.AddEvent("Health check failed")
-	}
-}
 
 func main() {
 	if err := run(); err != nil {
@@ -62,18 +44,6 @@ func run() error {
 	defer func() {
 		err = errors.Join(err, otelShutdown(context.Background()))
 	}()
-
-	http.HandleFunc("/health", healthCheckHandler)
-	srv := &http.Server{
-		Addr:         ":8085",
-		BaseContext:  func(_ net.Listener) context.Context { return ctx },
-		ReadTimeout:  time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
-
-	if err := srv.ListenAndServe(); err != nil {
-		return err
-	}
 
 	// Initialize the provider with callbacks to track linked components
 	providerHandler := Handler{
