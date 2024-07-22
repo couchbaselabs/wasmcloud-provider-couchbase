@@ -14,14 +14,6 @@ import (
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase/gocb/v2"
 	"github.com/wasmCloud/provider-sdk-go"
-	"go.opentelemetry.io/otel"
-
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
 func main() {
@@ -104,32 +96,43 @@ func run() error {
 	return nil
 }
 
+// Provider handler functions
 func handleNewTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
 	handler.Logger.Info("Handling new target link", "link", link)
 	handler.linkedFrom[link.SourceID] = link.TargetConfig
-	err := ValidateCouchbaseConfig(link.TargetConfig)
+	couchbaseConnectionArgs, err := validateCouchbaseConfig(link.TargetConfig, link.TargetSecrets)
 	if err != nil {
 		handler.Logger.Error("Invalid couchbase target config", "error", err)
 		return err
 	}
-	handler.updateCouchbaseCluster(handler, link.SourceID, link.TargetConfig)
+	handler.updateCouchbaseCluster(handler, link.SourceID, couchbaseConnectionArgs)
 	return nil
 }
 
-func ValidateCouchbaseConfig(config map[string]string) error {
-	if config["username"] == "" {
-		return errors.New("username is required")
+func (h *Handler) updateCouchbaseCluster(handler *Handler, sourceId string, connectionArgs CouchbaseConnectionArgs) {
+	// Connect to the cluster
+	cluster, err := gocb.Connect(connectionArgs.ConnectionString, gocb.ClusterOptions{
+		Username: connectionArgs.Username,
+		Password: connectionArgs.Password,
+	})
+	if err != nil {
+		handler.Logger.Error("unable to connect to couchbase cluster", "error", err)
+		return
 	}
-	if config["password"] == "" {
-		return errors.New("password is required")
+	var collection *gocb.Collection
+	if connectionArgs.CollectionName != "" && connectionArgs.ScopeName != "" {
+		collection = cluster.Bucket(connectionArgs.BucketName).Scope(connectionArgs.ScopeName).Collection(connectionArgs.CollectionName)
+	} else {
+		collection = cluster.Bucket(connectionArgs.BucketName).DefaultCollection()
 	}
-	if config["bucketName"] == "" {
-		return errors.New("bucket is required")
+
+	bucket := cluster.Bucket(connectionArgs.BucketName)
+	if err = bucket.WaitUntilReady(5*time.Second, nil); err != nil {
+		handler.Logger.Error("unable to connect to couchbase bucket", "error", err)
 	}
-	if config["connectionString"] == "" {
-		return errors.New("connectionString is required")
-	}
-	return nil
+
+	// Store the connection
+	handler.clusterConnections[sourceId] = collection
 }
 
 func handleDelTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
@@ -139,7 +142,7 @@ func handleDelTargetLink(handler *Handler, link provider.InterfaceLinkDefinition
 }
 
 func handleHealthCheck(handler *Handler) string {
-	handler.Logger.Info("Handling health check")
+	handler.Logger.Debug("Handling health check")
 	return "provider healthy"
 }
 
@@ -147,79 +150,4 @@ func handleShutdown(handler *Handler) error {
 	handler.Logger.Info("Handling shutdown")
 	// clear(handler.linkedFrom)
 	return nil
-}
-
-func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
-	var shutdownFuncs []func(context.Context) error
-
-	// shutdown calls cleanup functions registered via shutdownFuncs.
-	// The errors from the calls are joined.
-	// Each registered cleanup will be invoked once.
-	shutdown = func(ctx context.Context) error {
-		var err error
-		for _, fn := range shutdownFuncs {
-			err = errors.Join(err, fn(ctx))
-		}
-		shutdownFuncs = nil
-		return err
-	}
-
-	// handleErr calls shutdown for cleanup and makes sure that all errors are returned.
-	handleErr := func(inErr error) {
-		err = errors.Join(inErr, shutdown(ctx))
-	}
-
-	// Set up propagator.
-	prop := newPropagator()
-	otel.SetTextMapPropagator(prop)
-
-	// Set up trace provider.
-	tracerProvider, err := newTraceProvider()
-	if err != nil {
-		handleErr(err)
-		return
-	}
-	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
-	otel.SetTracerProvider(tracerProvider)
-	traceProvider := otel.GetTracerProvider()
-	tracer = traceProvider.Tracer(TRACER_NAME)
-
-	return
-}
-
-func newExporter(ctx context.Context) (*otlptrace.Exporter, error) {
-
-	exporter, err := otlptrace.New(
-		context.Background(),
-		otlptracehttp.NewClient(
-			otlptracehttp.WithEndpoint("localhost:4318"),
-
-			otlptracehttp.WithInsecure(),
-		),
-	)
-	return exporter, err
-}
-
-func newTraceProvider() (*trace.TracerProvider, error) {
-	traceExporter, err := newExporter(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	traceProvider := trace.NewTracerProvider(
-		trace.WithBatcher(traceExporter,
-			// Default is 5s. Set to 1s for demonstrative purposes.
-			trace.WithBatchTimeout(time.Second)),
-		trace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("couchbase-provider"),
-		)))
-	return traceProvider, nil
-}
-
-func newPropagator() propagation.TextMapPropagator {
-	return propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	)
 }

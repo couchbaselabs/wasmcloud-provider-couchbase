@@ -6,6 +6,11 @@ metadata:
     version: v0.0.1
     description: 'Couchbase capability provider demonstration with wasmCloud'
 spec:
+  policies:
+    - name: nats-kv
+      type: policy.secret.wasmcloud.dev/v1alpha1
+      properties:
+        backend: nats-kv
   components:
     - name: counter
       type: component
@@ -14,39 +19,37 @@ spec:
       traits:
         - type: spreadscaler
           properties:
-            replicas: 1
+            replicas: 100
         # Link the component to the provider on wasi-keyvalue
         - type: link
           properties:
-            target: couchbase
             namespace: wasi
             package: keyvalue
             interfaces: [atomics, store]
-            target_config:
-              - name: provider-config
-                properties:
-                  username: 'Administrator'
-                  password: 'password'
-                  bucketName: 'test'
-                  connectionString: 'localhost'
-                  scopeName: 'test'
+            target:
+              name: couchbase
+              secrets:
+                - name: couchbase_password
+                  properties:
+                    policy: nats-kv
+                    key: couchbase_password
+              config:
+                - name: provider-config
+                  properties:
+                    username: 'Administrator'
+                    bucketName: 'test'
+                    connectionString: 'localhost'
+
     - name: couchbase
       type: capability
       properties:
         image: file://./build/wasmcloud-provider-couchbase.par.gz
         id: couchbase
-        config:
-          - name: provider-config
-            properties:
-              username: 'Administrator'
-              password: 'password'
-              bucketName: 'test'
-              connectionString: 'localhost'
     # Add a capability provider that enables HTTP access
     - name: httpserver
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/http-server:0.20.0
+        image: ghcr.io/wasmcloud/http-server:0.21.0
       traits:
         # Link the httpserver to the component, and configure the HTTP server
         # to listen on port 8080 for incoming requests
@@ -56,7 +59,8 @@ spec:
             namespace: wasi
             package: http
             interfaces: [incoming-handler]
-            source_config:
-              - name: default-http
-                properties:
-                  address: 127.0.0.1:8080
+            source:
+              config:
+                - name: default-http
+                  properties:
+                    address: 127.0.0.1:8080
