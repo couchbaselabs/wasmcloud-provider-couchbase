@@ -8,7 +8,7 @@ This provider uses the **RawJSONTranscoder** for Couchbase, storing any new keys
 
 Prerequisites:
 
-- [wash 0.29](https://wasmcloud.com/docs/installation) or later
+- [wash 0.30](https://wasmcloud.com/docs/installation) or later
 
 Build this capability provider with:
 
@@ -18,19 +18,33 @@ wash build
 
 ## Run
 
-Prerequisites:
+### Prerequisites
 
-- [wash 0.29](https://wasmcloud.com/docs/installation) or later
+- [wash 0.30](https://wasmcloud.com/docs/installation) or later
+- The [secrets-nats-kv](https://github.com/wasmCloud/wasmCloud/tree/main/crates/secrets-nats-kv) CLI installed (for now this requires a Rust toolchain)
 - A built couchbase capability provider, see [#build](#build)
 - Setup Couchbase server with the required configuration for testing using docker-compose.yaml in the repo.
-   ```
-   docker-compose up -d
-   ```
-  Alternatively, you can use [Quick Install](https://docs.couchbase.com/server/current/getting-started/do-a-quick-install.html) guide with a bucket named **test** created.
- 
+
+```bash
+docker-compose up -d
+```
+
+Alternatively, you can use [Quick Install](https://docs.couchbase.com/server/current/getting-started/do-a-quick-install.html) guide with a bucket named **test** created.
+
+### Running
 
 ```shell
-wash up -d
+WASMCLOUD_SECRETS_TOPIC=wasmcloud.secrets \
+    wash up -d
+
+# Generate encryption keys and run the backend
+export ENCRYPTION_XKEY_SEED=$(wash keys gen curve -o json | jq -r '.seed')
+export TRANSIT_XKEY_SEED=$(wash keys gen curve -o json | jq -r '.seed')
+secrets-nats-kv run &
+# Put the password in the NATS KV secrets backend
+provider_key=$(wash inspect ./build/wasmcloud-provider-couchbase.par.gz -o json | jq -r '.service')
+secrets-nats-kv put couchbase_password --string password
+secrets-nats-kv add-mapping $provider_key --secret couchbase_password
 wash app deploy ./wadm.yaml
 ```
 
@@ -42,7 +56,7 @@ curl localhost:8080/couchbase
 
 ## Test
 
-To test the WIT bindings, download [`wit-bindgen`][wit-bindgen] and run the following:
+To test the WIT bindings, download [wit-bindgen](https://github.com/bytecodealliance/wit-bindgen) and run the following:
 
 ```console
 wit-deps && wit-bindgen rust --out-dir /tmp/wit wit/
