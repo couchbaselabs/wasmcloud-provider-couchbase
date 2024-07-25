@@ -123,11 +123,11 @@ func ValidateCouchbaseConfig(config map[string]string) error {
 	if config["password"] == "" {
 		return errors.New("password is required")
 	}
-	if config["bucket"] == "" {
+	if config["bucketName"] == "" {
 		return errors.New("bucket is required")
 	}
-	if config["host"] == "" {
-		return errors.New("host is required")
+	if config["connectionString"] == "" {
+		return errors.New("connectionString is required")
 	}
 	return nil
 }
