@@ -29,7 +29,7 @@ spec:
             target:
               name: couchbase
               secrets:
-                - name: couchbase_password
+                - name: password
                   properties:
                     policy: nats-kv
                     key: couchbase_password
