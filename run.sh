@@ -1,5 +1,6 @@
 #!/bin/bash
 
+cd examples/wasi-keyvalue
 host_data='
 {
     "lattice_rpc_url": "0.0.0.0:4222",
