@@ -69,7 +69,7 @@ func run() error {
 	signalCh := make(chan os.Signal, 1)
 
 	// Handle RPC operations
-	stopFunc, err := server.Serve(p.RPCClient, &providerHandler, &providerHandler)
+	stopFunc, err := server.Serve(p.RPCClient, &providerHandler)
 	if err != nil {
 		p.Shutdown()
 		return err

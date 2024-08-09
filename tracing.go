@@ -46,8 +46,9 @@ func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	}
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
-	traceProvider := otel.GetTracerProvider()
-	tracer = traceProvider.Tracer(TRACER_NAME)
+	// TODO: Uncomment this line to use the tracer.
+	// traceProvider := otel.GetTracerProvider()
+	// tracer = traceProvider.Tracer(TRACER_NAME)
 
 	return
 }
