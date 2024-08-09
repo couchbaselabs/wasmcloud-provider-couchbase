@@ -34,6 +34,7 @@ Alternatively, you can use [Quick Install](https://docs.couchbase.com/server/cur
 ### Running
 
 ```shell
+cd examples/wasi-keyvalue
 WASMCLOUD_SECRETS_TOPIC=wasmcloud.secrets \
     wash up -d
 
