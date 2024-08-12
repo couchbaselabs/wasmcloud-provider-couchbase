@@ -1,9 +1,9 @@
 apiVersion: core.oam.dev/v1beta1
 kind: Application
 metadata:
-  name: couchbase-demo
+  name: couchbase
   annotations:
-    version: v0.0.1
+    version: v0.2.0
     description: 'Couchbase capability provider demonstration with wasmCloud'
 spec:
   policies:
@@ -12,20 +12,20 @@ spec:
       properties:
         backend: nats-kv
   components:
-    - name: counter
+    - name: component
       type: component
       properties:
-        image: ghcr.io/wasmcloud/components/http-keyvalue-counter-rust:0.1.0
+        image: file://./components/rust/build/rust_s.wasm
       traits:
         - type: spreadscaler
           properties:
             replicas: 100
-        # Link the component to the provider on wasi-keyvalue
+        # Link the component to the provider on wasmcloud:couchbase/document
         - type: link
           properties:
-            namespace: wasi
-            package: keyvalue
-            interfaces: [atomics, store]
+            namespace: wasmcloud
+            package: couchbase
+            interfaces: [document]
             target:
               name: couchbase
               secrets:
@@ -49,13 +49,13 @@ spec:
     - name: httpserver
       type: capability
       properties:
-        image: ghcr.io/wasmcloud/http-server:0.21.0
+        image: ghcr.io/wasmcloud/http-server:0.22.0
       traits:
         # Link the httpserver to the component, and configure the HTTP server
         # to listen on port 8080 for incoming requests
         - type: link
           properties:
-            target: counter
+            target: component
             namespace: wasi
             package: http
             interfaces: [incoming-handler]

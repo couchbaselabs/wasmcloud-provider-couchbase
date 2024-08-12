@@ -2,9 +2,17 @@
 
 # wasmcloud-provider-couchbase
 
-This is a capability provider for wasmCloud to provide Couchbase KV connectivity to Wasm applications via `wasi-keyvalue`. At the moment it supports the `wasi:keyvalue/store@0.2.0-draft` interface.
+This is a capability provider for wasmCloud to provide Couchbase KV connectivity to Wasm applications via the `wasmcloud-couchbase` interface.
 
-This provider uses the **RawJSONTranscoder** for Couchbase, storing any new keys as binary data. Since the wasi-keyvalue interface works entirely in storing and retrieving binary data, the deserialization into a `struct` or structured data must be done on the component side.
+This provider uses the **RawJSONTranscoder** for Couchbase, storing any new keys as binary data. The deserialization into a `struct` or structured data must be done on the component side as the provider does not have information about the desired shape of data.
+
+## Interface support
+
+- [x] wasmcloud:couchbase/document@0.1.0-draft
+- [ ] wasmcloud:couchbase/fts@0.1.0-draft
+- [ ] wasmcloud:couchbase/subdocument-lookup@0.1.0-draft
+- [ ] wasmcloud:couchbase/subdocument-mutate@0.1.0-draft
+- [ ] wasmcloud:couchbase/sqlpp@0.1.0-draft
 
 ## Build
 
@@ -16,6 +24,13 @@ Build this capability provider with:
 
 ```shell
 wash build
+```
+
+Build the example components with:
+
+```shell
+wash build -p components/rust
+wash build -p components/golang
 ```
 
 ## Run
@@ -36,7 +51,6 @@ Alternatively, you can use [Quick Install](https://docs.couchbase.com/server/cur
 ### Running
 
 ```shell
-cd examples/wasi-keyvalue
 WASMCLOUD_SECRETS_TOPIC=wasmcloud.secrets \
     wash up -d
 
@@ -51,10 +65,12 @@ secrets-nats-kv add-mapping $provider_key --secret couchbase_password
 wash app deploy ./wadm.yaml
 ```
 
-Then you can test the increment functionality with cURL:
+Then you can invoke either the Rust component or the Golang component on port 8080 and 8081, respectively. Both components implement the exact same functionality, which simply takes a payload and a path to roundtrip a JSON document in Couchbase.
 
 ```shell
-curl localhost:8080/couchbase
+curl -d '{"demo": true, "couchbase": "db", "wasmcloud": "application platform"}' \
+    localhost:8080/mykey
+{"demo": true, "couchbase": "db", "wasmcloud": "application platform"}%
 ```
 
 ## Test
