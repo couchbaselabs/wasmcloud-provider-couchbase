@@ -12,10 +12,10 @@ spec:
       properties:
         backend: nats-kv
   components:
-    - name: component
+    - name: golang
       type: component
       properties:
-        image: file://./components/rust/build/rust_s.wasm
+        image: file://./components/golang/build/golang_s.wasm
       traits:
         - type: spreadscaler
           properties:
@@ -39,6 +39,29 @@ spec:
                     username: 'Administrator'
                     bucketName: 'test'
                     connectionString: 'localhost'
+    - name: rust
+      type: component
+      properties:
+        image: file://./components/rust/build/rust_s.wasm
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 100
+        # Link the component to the provider on wasi-keyvalue
+        - type: link
+          properties:
+            namespace: wasmcloud
+            package: couchbase
+            interfaces: [document]
+            target:
+              name: couchbase
+              secrets:
+                - name: password
+                  properties:
+                    policy: nats-kv
+                    key: couchbase_password
+              config:
+                - name: couchbase-provider_config
 
     - name: couchbase
       type: capability
@@ -55,12 +78,23 @@ spec:
         # to listen on port 8080 for incoming requests
         - type: link
           properties:
-            target: component
+            target: rust
             namespace: wasi
             package: http
             interfaces: [incoming-handler]
             source:
               config:
-                - name: default-http
+                - name: 8080-http
                   properties:
                     address: 127.0.0.1:8080
+        - type: link
+          properties:
+            target: golang
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler]
+            source:
+              config:
+                - name: 8081-http
+                  properties:
+                    address: 127.0.0.1:8081
