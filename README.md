@@ -1,3 +1,5 @@
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/couchbaselabs/wasmcloud-provider-couchbase )
+
 # wasmcloud-provider-couchbase
 
 This is a capability provider for wasmCloud to provide Couchbase KV connectivity to Wasm applications via `wasi-keyvalue`. At the moment it supports the `wasi:keyvalue/store@0.2.0-draft` interface.
