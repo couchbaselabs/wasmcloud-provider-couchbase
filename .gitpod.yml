@@ -21,6 +21,8 @@ ports:
   onOpen: ignore
 - port: 4223 # Nats Websocket
   onOpen: ignore
+- port: 8080 # Application HTTP Server provider default endpoint (see wadm.yaml)
+  onOpen: open-browser
 - port: 8091 # Couchbase Web console, REST/HTTP interface
   onOpen: open-browser
   visibility: public
