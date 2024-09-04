@@ -14,8 +14,8 @@ import (
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	gocbt "github.com/couchbase/gocb-opentelemetry"
 	"github.com/couchbase/gocb/v2"
-	"github.com/wasmCloud/provider-sdk-go"
 	"go.opentelemetry.io/otel"
+	"go.wasmcloud.dev/provider"
 )
 
 func main() {
