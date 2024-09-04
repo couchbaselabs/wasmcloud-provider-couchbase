@@ -13,7 +13,7 @@ import (
 
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase/gocb/v2"
-	"github.com/wasmCloud/provider-sdk-go"
+	"go.wasmcloud.dev/provider"
 )
 
 func main() {
