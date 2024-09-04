@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 
-	"github.com/wasmCloud/provider-sdk-go"
+	"go.wasmcloud.dev/provider"
 )
 
 type CouchbaseConnectionArgs struct {

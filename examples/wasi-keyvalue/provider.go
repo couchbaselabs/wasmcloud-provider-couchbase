@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	"github.com/couchbase/gocb/v2"
-	sdk "github.com/wasmCloud/provider-sdk-go"
-	wrpc "github.com/wrpc/wrpc/go"
-	wrpcnats "github.com/wrpc/wrpc/go/nats"
+	sdk "go.wasmcloud.dev/provider"
+	wrpc "wrpc.io/go"
+	wrpcnats "wrpc.io/go/nats"
 
 	// Generated bindings
 	"github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings/exports/wrpc/keyvalue/atomics"

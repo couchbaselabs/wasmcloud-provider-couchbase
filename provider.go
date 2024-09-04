@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/couchbase/gocb/v2"
-	sdk "github.com/wasmCloud/provider-sdk-go"
-	wrpc "github.com/wrpc/wrpc/go"
+	sdk "go.wasmcloud.dev/provider"
+	wrpc "wrpc.io/go"
 
 	// Generated bindings
 	"github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings/exports/wasmcloud/couchbase/document"
