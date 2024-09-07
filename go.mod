@@ -3,7 +3,7 @@ module github.com/couchbase-examples/wasmcloud-provider-couchbase
 go 1.22.3
 
 require (
-	github.com/couchbase/gocb/v2 v2.8.1
+	github.com/couchbase/gocb/v2 v2.9.2-0.20240814074849-fcf55fc858b3
 	github.com/wasmCloud/provider-sdk-go v0.0.0-20240724131928-654ff747dffc
 	github.com/wrpc/wrpc/go v0.0.0-20240619071643-b830439e40d6
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0
@@ -11,16 +11,18 @@ require (
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/couchbase/gocb-opentelemetry v0.1.2-0.20240814081329-f68bd3eca445 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240711142825-46eb208f015d // indirect
 )
 
 require (
-	github.com/couchbase/gocbcore/v10 v10.4.1 // indirect
-	github.com/couchbase/gocbcoreps v0.1.2 // indirect
+	github.com/couchbase/gocbcore/v10 v10.5.2-0.20240730072846-40aebed77ad1 // indirect
+	github.com/couchbase/gocbcoreps v0.1.3 // indirect
 	github.com/couchbase/goprotostellar v1.0.2 // indirect
-	github.com/couchbaselabs/gocbconnstr/v2 v2.0.0-20230515165046-68b522a21131 // indirect
+	github.com/couchbaselabs/gocbconnstr/v2 v2.0.0-20240607131231-fb385523de28 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
