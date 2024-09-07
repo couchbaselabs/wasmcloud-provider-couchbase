@@ -12,8 +12,10 @@ import (
 	"time"
 
 	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
+	gocbt "github.com/couchbase/gocb-opentelemetry"
 	"github.com/couchbase/gocb/v2"
 	"github.com/wasmCloud/provider-sdk-go"
+	"go.opentelemetry.io/otel"
 )
 
 func main() {
@@ -106,6 +108,7 @@ func (h *Handler) updateCouchbaseCluster(sourceId string, connectionArgs Couchba
 	cluster, err := gocb.Connect(connectionArgs.ConnectionString, gocb.ClusterOptions{
 		Username: connectionArgs.Username,
 		Password: connectionArgs.Password,
+		Tracer: gocbt.NewOpenTelemetryRequestTracer(otel.GetTracerProvider()),
 	})
 	if err != nil {
 		h.Logger.Error("unable to connect to couchbase cluster", "error", err)
