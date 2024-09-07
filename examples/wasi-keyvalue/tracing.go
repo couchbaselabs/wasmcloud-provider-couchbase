@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	wrpcnats "github.com/wrpc/wrpc/go/nats"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -57,7 +58,6 @@ func newExporter(ctx context.Context) (*otlptrace.Exporter, error) {
 		ctx,
 		otlptracehttp.NewClient(
 			otlptracehttp.WithEndpoint("localhost:4318"),
-
 			otlptracehttp.WithInsecure(),
 		),
 	)
@@ -86,4 +86,19 @@ func newPropagator() propagation.TextMapPropagator {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
+}
+
+// extractTracerHeaderContext extracts the trace context from the wrpc headers.
+func extractTracerHeaderContext(ctx context.Context) context.Context {
+	headers, ok := wrpcnats.HeaderFromContext(ctx)
+	if !ok {
+		return ctx
+	}
+
+	pr := propagation.MapCarrier{}
+	pr.Set("traceparent", headers.Get("traceparent"))
+	pr.Set("tracestate", headers.Get("tracestate"))
+	pr.Set("baggage", headers.Get("baggage"))
+
+	return otel.GetTextMapPropagator().Extract(ctx, pr)
 }
