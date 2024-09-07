@@ -44,18 +44,10 @@ func run() error {
 	}
 
 	p, err := provider.New(
-		provider.TargetLinkPut(func(link provider.InterfaceLinkDefinition) error {
-			return handleNewTargetLink(&providerHandler, link)
-		}),
-		provider.TargetLinkDel(func(link provider.InterfaceLinkDefinition) error {
-			return handleDelTargetLink(&providerHandler, link)
-		}),
-		provider.HealthCheck(func() string {
-			return handleHealthCheck(&providerHandler)
-		}),
-		provider.Shutdown(func() error {
-			return handleShutdown(&providerHandler)
-		}),
+		provider.TargetLinkPut(providerHandler.handleNewTargetLink),
+		provider.TargetLinkDel(providerHandler.handleDelTargetLink),
+		provider.HealthCheck(providerHandler.handleHealthCheck),
+		provider.Shutdown(providerHandler.handleShutdown),
 	)
 	if err != nil {
 		return err
@@ -97,26 +89,26 @@ func run() error {
 }
 
 // Provider handler functions
-func handleNewTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	handler.Logger.Info("Handling new target link", "link", link)
-	handler.linkedFrom[link.SourceID] = link.TargetConfig
+func (h *Handler) handleNewTargetLink(link provider.InterfaceLinkDefinition) error {
+	h.Logger.Info("Handling new target link", "link", link)
+	h.linkedFrom[link.SourceID] = link.TargetConfig
 	couchbaseConnectionArgs, err := validateCouchbaseConfig(link.TargetConfig, link.TargetSecrets)
 	if err != nil {
-		handler.Logger.Error("Invalid couchbase target config", "error", err)
+		h.Logger.Error("Invalid couchbase target config", "error", err)
 		return err
 	}
-	handler.updateCouchbaseCluster(handler, link.SourceID, couchbaseConnectionArgs)
+	h.updateCouchbaseCluster(link.SourceID, couchbaseConnectionArgs)
 	return nil
 }
 
-func (h *Handler) updateCouchbaseCluster(handler *Handler, sourceId string, connectionArgs CouchbaseConnectionArgs) {
+func (h *Handler) updateCouchbaseCluster(sourceId string, connectionArgs CouchbaseConnectionArgs) {
 	// Connect to the cluster
 	cluster, err := gocb.Connect(connectionArgs.ConnectionString, gocb.ClusterOptions{
 		Username: connectionArgs.Username,
 		Password: connectionArgs.Password,
 	})
 	if err != nil {
-		handler.Logger.Error("unable to connect to couchbase cluster", "error", err)
+		h.Logger.Error("unable to connect to couchbase cluster", "error", err)
 		return
 	}
 	var collection *gocb.Collection
@@ -128,26 +120,26 @@ func (h *Handler) updateCouchbaseCluster(handler *Handler, sourceId string, conn
 
 	bucket := cluster.Bucket(connectionArgs.BucketName)
 	if err = bucket.WaitUntilReady(5*time.Second, nil); err != nil {
-		handler.Logger.Error("unable to connect to couchbase bucket", "error", err)
+		h.Logger.Error("unable to connect to couchbase bucket", "error", err)
 	}
 
 	// Store the connection
-	handler.clusterConnections[sourceId] = collection
+	h.clusterConnections[sourceId] = collection
 }
 
-func handleDelTargetLink(handler *Handler, link provider.InterfaceLinkDefinition) error {
-	handler.Logger.Info("Handling del target link", "link", link)
-	delete(handler.linkedFrom, link.Target)
+func (h *Handler) handleDelTargetLink(link provider.InterfaceLinkDefinition) error {
+	h.Logger.Info("Handling del target link", "link", link)
+	delete(h.linkedFrom, link.Target)
 	return nil
 }
 
-func handleHealthCheck(handler *Handler) string {
-	handler.Logger.Debug("Handling health check")
+func (h *Handler) handleHealthCheck() string {
+	h.Logger.Debug("Handling health check")
 	return "provider healthy"
 }
 
-func handleShutdown(handler *Handler) error {
-	handler.Logger.Info("Handling shutdown")
+func (h *Handler) handleShutdown() error {
+	h.Logger.Info("Handling shutdown")
 	// clear(handler.linkedFrom)
 	return nil
 }
