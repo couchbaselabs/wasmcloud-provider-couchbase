@@ -39,7 +39,7 @@ type Handler struct {
 // Implementation of wasi:keyvalue/store
 
 func (h *Handler) Get(ctx context.Context, bucket string, key string) (*wrpc.Result[[]uint8, store.Error], error) {
-	ctx = extractTracerHeaderContext(ctx)
+	ctx = extractTraceHeaderContext(ctx)
 	ctx, span := tracer.Start(ctx, "GET")
 	defer span.End()
 
@@ -84,7 +84,7 @@ func (h *Handler) getCollectionFromContext(ctx context.Context) (*gocb.Collectio
 }
 
 func (h *Handler) Set(ctx context.Context, bucket string, key string, value []uint8) (*wrpc.Result[struct{}, store.Error], error) {
-	ctx = extractTracerHeaderContext(ctx)
+	ctx = extractTraceHeaderContext(ctx)
 	ctx, span := tracer.Start(ctx, "SET")
 	defer span.End()
 
@@ -107,7 +107,7 @@ func (h *Handler) Set(ctx context.Context, bucket string, key string, value []ui
 }
 
 func (h *Handler) Delete(ctx context.Context, bucket string, key string) (*wrpc.Result[struct{}, store.Error], error) {
-	ctx = extractTracerHeaderContext(ctx)
+	ctx = extractTraceHeaderContext(ctx)
 	ctx, span := tracer.Start(ctx, "DELETE")
 	defer span.End()
 
@@ -129,7 +129,7 @@ func (h *Handler) Delete(ctx context.Context, bucket string, key string) (*wrpc.
 }
 
 func (h *Handler) Exists(ctx context.Context, bucket string, key string) (*wrpc.Result[bool, store.Error], error) {
-	ctx = extractTracerHeaderContext(ctx)
+	ctx = extractTraceHeaderContext(ctx)
 	ctx, span := tracer.Start(ctx, "EXISTS")
 	defer span.End()
 
@@ -157,7 +157,7 @@ func (h *Handler) ListKeys(ctx context.Context, bucket string, cursor *uint64) (
 
 // Implementation of wasi:keyvalue/atomics
 func (h *Handler) Increment(ctx context.Context, bucket string, key string, delta uint64) (*wrpc.Result[uint64, atomics.Error], error) {
-	ctx = extractTracerHeaderContext(ctx)
+	ctx = extractTraceHeaderContext(ctx)
 	ctx, span := tracer.Start(ctx, "INCREMENT")
 	defer span.End()
 

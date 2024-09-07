@@ -88,8 +88,8 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-// extractTracerHeaderContext extracts the trace context from the wrpc headers.
-func extractTracerHeaderContext(ctx context.Context) context.Context {
+// extractTraceHeaderContext extracts the trace context from the wrpc headers.
+func extractTraceHeaderContext(ctx context.Context) context.Context {
 	headers, ok := wrpcnats.HeaderFromContext(ctx)
 	if !ok {
 		return ctx
