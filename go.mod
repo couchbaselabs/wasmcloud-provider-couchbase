@@ -6,8 +6,8 @@ require (
 	github.com/couchbase/gocb-opentelemetry v0.1.2-0.20240814081329-f68bd3eca445
 	github.com/couchbase/gocb/v2 v2.9.2-0.20240814074849-fcf55fc858b3
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0
-	go.wasmcloud.dev/provider v0.0.2
-	wrpc.io/go v0.0.3
+	go.wasmcloud.dev/provider v0.0.4
+	wrpc.io/go v0.1.0
 )
 
 require (
