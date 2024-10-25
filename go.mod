@@ -3,6 +3,7 @@ module github.com/couchbase-examples/wasmcloud-provider-couchbase
 go 1.22.3
 
 require (
+	github.com/couchbase/gocb-opentelemetry v0.1.2-0.20240814081329-f68bd3eca445
 	github.com/couchbase/gocb/v2 v2.9.2-0.20240814074849-fcf55fc858b3
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0
 	go.wasmcloud.dev/provider v0.0.2
@@ -11,8 +12,8 @@ require (
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
-	github.com/couchbase/gocb-opentelemetry v0.1.2-0.20240814081329-f68bd3eca445 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.21.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240801233905-f7977e064c9c // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.4.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.28.0 // indirect
@@ -21,7 +22,6 @@ require (
 	go.opentelemetry.io/otel/log v0.4.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.4.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.28.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240730163845-b1a4ccb954bf // indirect
 )
