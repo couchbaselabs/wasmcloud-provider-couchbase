@@ -24,10 +24,10 @@ func GetAllReplicaOptions(o *document.DocumentGetAllReplicaOptions) *gocb.GetAll
 // GetOptions
 func GetOptions(o *document.DocumentGetOptions) *gocb.GetOptions {
 	if o == nil {
-		return &gocb.GetOptions{Transcoder: gocb.NewRawJSONTranscoder()}
+		return &gocb.GetOptions{Transcoder: gocb.NewRawStringTranscoder()}
 	}
 	return &gocb.GetOptions{
-		Transcoder: gocb.NewRawJSONTranscoder(),
+		Transcoder: gocb.NewRawStringTranscoder(),
 		WithExpiry: o.WithExpiry,
 		Project:    o.Project,
 		// ...
@@ -67,7 +67,7 @@ func GetAnyReplicaOptions(o *document.DocumentGetAnyReplicaOptions) *gocb.GetAny
 // InsertOptions
 func InsertOptions(o *document.DocumentInsertOptions) *gocb.InsertOptions {
 	if o == nil {
-		return &gocb.InsertOptions{Transcoder: gocb.NewRawJSONTranscoder()}
+		return &gocb.InsertOptions{Transcoder: gocb.NewRawStringTranscoder()}
 	}
 	return &gocb.InsertOptions{
 		Timeout:    time.Duration(*o.TimeoutNs),
@@ -92,6 +92,7 @@ func ReplaceOptions(o *document.DocumentReplaceOptions) *gocb.ReplaceOptions {
 	}
 	return &gocb.ReplaceOptions{
 		Timeout: time.Duration(*o.TimeoutNs),
+		Transcoder: gocb.NewRawStringTranscoder(),
 	}
 }
 
@@ -118,7 +119,7 @@ func UnlockOptions(o *document.DocumentUnlockOptions) *gocb.UnlockOptions {
 // UpsertOptions
 func UpsertOptions(o *document.DocumentUpsertOptions) *gocb.UpsertOptions {
 	if o == nil {
-		return &gocb.UpsertOptions{Transcoder: gocb.NewRawJSONTranscoder()}
+		return &gocb.UpsertOptions{Transcoder: gocb.NewRawStringTranscoder()}
 	}
 	return &gocb.UpsertOptions{}
 }

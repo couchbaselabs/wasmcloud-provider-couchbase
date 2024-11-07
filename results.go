@@ -35,7 +35,7 @@ func GetResult(result *gocb.GetResult) (document.DocumentGetResult, error) {
 	}
 	expiresInNs := uint64(result.ExpiryTime().Nanosecond())
 	returnDoc := document.Document{}
-	returnDoc.SetRaw(content)
+	returnDoc.SetRaw(string(content))
 	return document.DocumentGetResult{
 		Document:    &returnDoc,
 		ExpiresInNs: &expiresInNs,

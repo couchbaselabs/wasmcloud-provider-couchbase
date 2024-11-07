@@ -141,7 +141,11 @@ func (h *Handler) Insert(ctx context.Context, id string, doc *types.Document, op
 	result, err := collection.Insert(id, docToInsert, InsertOptions(options))
 	if err != nil {
 		h.Logger.Error("Error inserting document", "error", err)
-		return Err[types.MutationMetadata](*types.NewDocumentErrorInvalidValue()), err
+		if errors.Is(err, gocb.ErrDocumentExists) {
+			return Err[types.MutationMetadata](*types.NewDocumentErrorAlreadyExists()), nil
+		} else {
+			return Err[types.MutationMetadata](*types.NewDocumentErrorInvalidValue()), nil
+		}
 	}
 	return Ok(MutationMetadata(result)), nil
 }
@@ -168,7 +172,14 @@ func (h *Handler) Replace(ctx context.Context, id string, doc *types.Document, o
 		h.Logger.Error("Error fetching collection from context", "error", err)
 		return nil, err
 	}
-	result, err := collection.Replace(id, doc, ReplaceOptions(options))
+
+	replacement, ok := doc.GetRaw()
+	if !ok {
+		h.Logger.Error("Error getting raw document", "doc", doc)
+		return Err[types.MutationMetadata](*types.NewDocumentErrorNotJson()), nil
+	}
+
+	result, err := collection.Replace(id, replacement, ReplaceOptions(options))
 	if err != nil {
 		h.Logger.Error("Error replacing document", "error", err)
 		return nil, err
