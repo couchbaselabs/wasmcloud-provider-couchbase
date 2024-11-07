@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	server "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
+	wrpc "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	gocbt "github.com/couchbase/gocb-opentelemetry"
 	"github.com/couchbase/gocb/v2"
 	"go.opentelemetry.io/otel"
@@ -63,7 +63,7 @@ func run() error {
 	signalCh := make(chan os.Signal, 1)
 
 	// Handle RPC operations
-	stopFunc, err := server.Serve(p.RPCClient, &providerHandler)
+	stopFunc, err := wrpc.Serve(p.RPCClient, &providerHandler)
 	if err != nil {
 		p.Shutdown()
 		return err
