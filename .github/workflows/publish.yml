@@ -1,0 +1,77 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+*
+      - v[0-9]+.[0-9]+.[0-9]+-*
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        cfg:
+          - wash-version: 0.37.0
+            go-version: 1.23.4
+            tinygo-version: 0.34.0
+            wit-bindgen-wrpc-version: 0.14.0
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Determine version
+        id: meta
+        shell: bash
+        env:
+          REF: ${{ github.ref }}
+          REF_PREFIX: 'refs/tags/v'
+        run: |
+          export VERSION=${REF#$REF_PREFIX};
+          echo -e "version=${VERSION}" >> $GITHUB_OUTPUT;
+
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a
+        with:
+          go-version: ${{ matrix.cfg.go-version }}
+
+      - uses: acifani/setup-tinygo@b2ba42b249c7d3efdfe94166ec0f48b3191404f7
+        with:
+          tinygo-version: ${{ matrix.cfg.tinygo-version }}
+          install-binaryen: "false"
+
+      - name: Install wash
+        uses: taiki-e/install-action@8c39981484df4e7ba41af8e8e078ac546d5e1b11
+        with:
+          tool: wash-cli@${{ matrix.cfg.wash-version }},wit-bindgen-cli
+
+      - name: Install wrpc
+        uses: jaxxstorm/action-install-gh-release@cd6b2b78ad38bdd294341cda064ec0692b06215b
+        with:
+          repo: bytecodealliance/wrpc
+          asset-name: wit-bindgen-wrpc
+          rename-to: wit-bindgen-wrpc
+          chmod: 0755
+          extension-matching: disable
+
+      - name: Build project
+        run: wash build
+
+      - name: Push version-tagged provider to GHCR
+        if: ${{ startsWith(github.ref, steps.meta.outputs.ref-prefix) }}
+        env:
+          WASH_REG_USER: ${{ github.repository_owner }}
+          WASH_REG_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          wash push ghcr.io/${{ github.repository_owner }}/providers/couchbase-test:${{ steps.meta.outputs.version }} build/wasmcloud-provider-couchbase.par.gz
