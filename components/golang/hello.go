@@ -9,11 +9,8 @@ import (
 	"github.com/couchbaselabs/wasmcloud-provider-couchbase/components/golang/gen/wasmcloud/couchbase/document"
 	"github.com/couchbaselabs/wasmcloud-provider-couchbase/components/golang/gen/wasmcloud/couchbase/types"
 	"github.com/julienschmidt/httprouter"
-	"go.wasmcloud.dev/component/log/wasilog"
 	"go.wasmcloud.dev/component/net/wasihttp"
 )
-
-var logger = wasilog.ContextLogger("golang-hello")
 
 func init() {
 	router := httprouter.New()
