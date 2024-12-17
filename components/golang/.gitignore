@@ -1,2 +1,4 @@
 gen/*
 build/*
+wit/deps/*
+wasmcloud.lock

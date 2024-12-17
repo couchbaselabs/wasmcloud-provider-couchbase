@@ -1,66 +1,71 @@
 package main
 
 import (
-	"strings"
+	"encoding/json"
+	"io"
+	"net/http"
 
-	gen "github.com/wasmcloud/wasmcloud/examples/golang/components/http-hello-world/gen"
+	"github.com/bytecodealliance/wasm-tools-go/cm"
+	"github.com/couchbaselabs/wasmcloud-provider-couchbase/components/golang/gen/wasmcloud/couchbase/document"
+	"github.com/couchbaselabs/wasmcloud-provider-couchbase/components/golang/gen/wasmcloud/couchbase/types"
+	"github.com/julienschmidt/httprouter"
+	"go.wasmcloud.dev/component/log/wasilog"
+	"go.wasmcloud.dev/component/net/wasihttp"
 )
 
-// Helper type aliases to make code more readable
-type HttpRequest = gen.ExportsWasiHttp0_2_0_IncomingHandlerIncomingRequest
-type HttpResponseWriter = gen.ExportsWasiHttp0_2_0_IncomingHandlerResponseOutparam
-type HttpOutgoingResponse = gen.WasiHttp0_2_0_TypesOutgoingResponse
-type HttpError = gen.WasiHttp0_2_0_TypesErrorCode
-
-type Document = gen.WasmcloudCouchbase0_1_0_draft_DocumentDocument
-
-type HttpServer struct{}
+var logger = wasilog.ContextLogger("golang-hello")
 
 func init() {
-	httpserver := HttpServer{}
-	// Set the incoming handler struct to HttpServer
-	gen.SetExportsWasiHttp0_2_0_IncomingHandler(httpserver)
+	router := httprouter.New()
+	router.POST("/:document_id", handleRequest)
+	wasihttp.Handle(router)
 }
 
-func (h HttpServer) Handle(request HttpRequest, responseWriter HttpResponseWriter) {
-	// Construct HttpResponse to send back
-	headers := gen.NewFields()
-	httpResponse := gen.NewOutgoingResponse(headers)
-	httpResponse.SetStatusCode(200)
-	body := httpResponse.Body().Unwrap()
-	bodyWrite := body.Write().Unwrap()
+func handleRequest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// Get document id
+	documentIdParameter := ps.ByName("document_id")
+	if len(documentIdParameter) == 0 {
+		documentIdParameter = "demodoc"
+	}
+	docId := types.DocumentID(documentIdParameter)
 
-	// Get document body & id
-	documentContents := request.Consume().Unwrap().Stream().Unwrap().BlockingRead(99999).Unwrap()
-	var documentId string
-	if request.PathWithQuery().IsSome() {
-		trimmed := strings.TrimLeft(request.PathWithQuery().Unwrap(), "/")
-		if trimmed == "" {
-			documentId = "demodoc"
-		} else {
-			documentId = trimmed
-		}
-	} else {
-		documentId = "demodoc"
+	// Get document body
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Unable to read http body",
+		})
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	doc := types.DocumentRaw(types.JSONString(data))
+
+	// Upsert document
+	upsertResult := document.Upsert(docId, doc, cm.Option[document.DocumentUpsertOptions]{})
+	if upsertResult.IsErr() {
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Failed to upsert document",
+			"error":   upsertResult.Err().String(),
+		})
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
-	// Upsert and get the document
-	document := gen.WasmcloudCouchbase0_1_0_draft_TypesDocumentRaw(string(documentContents))
-	gen.WasmcloudCouchbase0_1_0_draft_DocumentUpsert(documentId, document, gen.None[gen.WasmcloudCouchbase0_1_0_draft_DocumentDocumentUpsertOptions]())
-	res := gen.WasmcloudCouchbase0_1_0_draft_DocumentGet(documentId, gen.None[gen.WasmcloudCouchbase0_1_0_draft_DocumentDocumentGetOptions]())
-
-	// Send HTTP response
-	okResponse := gen.Ok[HttpOutgoingResponse, HttpError](httpResponse)
-	gen.StaticResponseOutparamSet(responseWriter, okResponse)
-	if res.IsOk() {
-		document := res.Unwrap()
-		bodyWrite.BlockingWriteAndFlush([]uint8(document.Document.GetRaw())).Unwrap()
-	} else {
-		bodyWrite.BlockingWriteAndFlush([]uint8("Document not found")).Unwrap()
+	// Get document
+	getResult := document.Get(docId, cm.Option[document.DocumentGetOptions]{})
+	if getResult.IsErr() {
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Failed to get document",
+			"error":   getResult.Err().String(),
+		})
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	bodyWrite.Drop()
-	gen.StaticOutgoingBodyFinish(body, gen.None[gen.WasiHttp0_2_0_TypesTrailers]())
+
+	// Write HTTP response
+	w.Write([]byte(*getResult.OK().Document.Raw()))
+	w.WriteHeader(http.StatusOK)
 }
 
-//go:generate wit-bindgen tiny-go wit --out-dir=gen --gofmt
+//go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
 func main() {}
