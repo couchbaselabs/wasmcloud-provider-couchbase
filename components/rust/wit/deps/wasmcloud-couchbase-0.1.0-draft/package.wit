@@ -1,0 +1,1212 @@
+package wasmcloud:couchbase@0.1.0-draft;
+
+/// Mappings of SQL++ (formerly known as N1QL) to WebAssembly (WIT) types
+interface sqlpp-types {
+  /// Errors that can occur when a SQL++ query is performed
+  variant sqlpp-query-error {
+    /// A completely unexpected query error
+    unexpected(string),
+  }
+
+  /// An embedding of SQL++ values to WebAssembly types
+  ///
+  /// This type should be used in building queries, and also in parsing/processing results,
+  /// as it is used for both parameters and returned results from queries.
+  variant sqlpp-value {
+    /// A NULL value
+    null,
+  }
+}
+
+/// General types that can be used throughout the couchbase interface
+interface types {
+  /// ID of a Document
+  ///
+  /// Note that Document IDs are expected to be:
+  /// - Assigned at the application level
+  /// - Be valid UTF-8 at the application level
+  /// - Be no longer than 250 bytes (not characters)
+  type document-id = string;
+
+  /// Path to a subdocument inside an existing document
+  type subdocument-path = string;
+
+  /// The span of a request, normally used when performing/enabling tracing
+  type request-span = string;
+
+  /// A string that is properly formatted JSON
+  type json-string = string;
+
+  /// Document field name (ex. to include in a search)
+  type document-field-name = string;
+
+  /// Collection name to include in a search
+  type collection-name = string;
+
+  /// Bucket name
+  type bucket-name = string;
+
+  /// Name of a search index
+  type search-index-name = string;
+
+  /// Whether to enable replica reads for the request
+  enum replica-read-level {
+    off,
+    on,
+  }
+
+  /// Direction in which to perform sorting
+  enum sort-direction {
+    asc,
+    desc,
+  }
+
+  /// Port of https://pkg.go.dev/time#Time
+  record time {
+    /// Offsets are assumed to be against the western hemisphere (GMT)
+    /// i.e. -14 -> 0 -> +14 UTC
+    offset: s8,
+    year: s32,
+    month: u8,
+    day: u8,
+    /// 24hr time (i.e. 6PM is represented as `18`)
+    hour: u8,
+    minute: u8,
+    second: u8,
+    milliseconds: u32,
+    nanoseconds: u32,
+  }
+
+  /// A keyspace-path that identifies a collection
+  record collection {
+    /// Bucket the collection belongs to
+    bucket: bucket-name,
+    /// Scope of the collection (ex. "_default" if not specified)
+    scope: option<string>,
+    /// Name of the collection (which may be a simple name, if only this value is specified)
+    name: collection-name,
+  }
+
+  /// Errors that can occur during operations on documents
+  variant document-error {
+    /// Document could not be found
+    not-found,
+    /// CAS revision submitted to operation does not match value on server
+    cas-mismatch,
+    /// Document is locked
+    locked,
+    /// Unlock con a document that is not locked
+    not-locked,
+    /// Document cannot be retrieved (from any replica)
+    unretrievable,
+    /// Document already exists (i.e. a duplicate)
+    already-exists,
+    /// Document is not JSON
+    not-json,
+    /// Document does not contain the specified sub-document path
+    path-not-found,
+    /// Sub-document path is invalid (could not be parsed)
+    path-invalid,
+    /// Sub-document path is too deeply nested
+    path-too-deep,
+    /// Sub-document operation could not insert
+    invalid-value,
+    /// An invalid delta is used when performing a sub-document operation
+    subdocument-delta-invalid,
+  }
+
+  /// Errors that occur when building/using document values
+  variant document-value-create-error {
+    /// JSON used to create the document value was invalid
+    invalid-json(string),
+  }
+
+  /// An implementer specific (efficient) implementation of a Document value
+  resource document-value {
+    /// Construct an empty document value (a dictionary, by default)
+    constructor();
+    /// Convert this JSON value into a string
+    to-string: func() -> string;
+    /// Build a document-value from a stringified JSON value
+    from-json: static func(json: string) -> result<document-value, document-value-create-error>;
+  }
+
+  /// WIT cannot currently support passing recursive value types, which means JSON cannot be properly
+  /// represetned as a WIT level type.
+  ///
+  /// What we use instead is a variant with two types:
+  /// - a valid JSON string (which may or may not be an object)
+  /// - an implementer-controlled value which is a valid JSON object (as defined by the implementer)
+  ///
+  /// The implementer-controlled value can be any implementation (usually a more efficient one)
+  /// that can be understood by the implementer. One requirement on this value is that it must be
+  /// possible to convert it to/from a raw JSON string at any time.
+  ///
+  /// An opaque resource that represents a JSON value, and can be efficiently
+  /// manipulated by implementers.
+  variant document {
+    /// A stringified JSON value represented by a resource, often used by callers
+    /// that cannot or do not want to construct an efficient implementer specific JSON value
+    raw(json-string),
+    /// A JSON value represented by a more efficient but opaque implementer-specific representation
+    %resource(document-value),
+  }
+
+  /// Errors related to bucket usage
+  variant bucket-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Metadata related to any mutation on a Couchbase collection (ex. CRUD operations)
+  record mutation-metadata {
+    /// CAS revision of the document
+    cas: u64,
+    /// The bucket on which the mutation was performed
+    bucket: string,
+    /// The ID of the vbucket (partition) that the operation was performed on
+    partition-id: u64,
+    /// The UUID of the vbucket (partition) that the operation was performed on
+    partition-uuid: u64,
+    /// The sequence number of the operation performed on the vbucket (partition)
+    seq: u64,
+  }
+
+  /// Durability level that should be used for operations
+  enum durability-level {
+    unknown,
+    none,
+    /// Replicate (hold in memory) to a majority of nodes
+    replicate-majority,
+    /// Replicate (hold in memory) to a majority of nodes, persist (write to disk) to master
+    replicate-majority-persist-master,
+    /// Persist to a majority of nodes
+    persist-majority,
+  }
+
+  /// As functions cannot be represented as part of types in WIT,
+  /// we represent static retry strategies
+  variant retry-strategy {
+    /// Retry a certain number of times with a given interval between each retry)
+    interval-times-ms(tuple<u64, u64>),
+  }
+
+  /// Level of data consistency required for a query
+  enum query-scan-consistency {
+    /// No data consistency required
+    not-bounded,
+    /// Request-level data consistency is required
+    request-plus,
+  }
+
+  /// Profiling mode to use during a query
+  enum query-profile-mode {
+    /// Disable query profiling
+    none,
+    /// Include phase-boudned profiling information in the response
+    phases,
+    /// Include timing profiling informatoin in the query response
+    timings,
+  }
+
+  /// Level of data consistency required for a search
+  enum search-scan-consistency {
+    /// No data consistency required
+    not-bounded,
+  }
+
+  /// Individual mutation token
+  record mutation-token {
+    bucket-name: string,
+    partition-uuid: u64,
+    partition-id: u64,
+    sequence-number: u64,
+  }
+
+  /// Collection of mutation tokens that represent a single state
+  record mutation-state {
+    tokens: list<mutation-token>,
+  }
+}
+
+/// Support CRUD access and modification of Documents stored in a Couchbase cluster.
+///
+/// Reference: https://docs.couchbase.com/c-sdk/current/concept-docs/documents.html
+interface document {
+  use types.{document, document-id, document-error, mutation-metadata, time, durability-level, retry-strategy, request-span, replica-read-level};
+
+  ///
+  /// Document - Insert ///
+  ///
+  /// Options for performing a document insert
+  record document-insert-options {
+    /// When the document should expire (nanoseconds)
+    expires-in-ns: u64,
+    /// (Deprecated)
+    /// Traditional durability settings for persistence, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    persist-to: u64,
+    /// (Deprecated)
+    /// Traditional durability settings for replication, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    replicate-to: u64,
+    /// Durability level for the mutation
+    ///
+    /// (this should be used instead of persist-to/replicate-to)
+    durability-level: durability-level,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  ///
+  /// Document - Replace ///
+  ///
+  /// Options for performing a document replace
+  record document-replace-options {
+    /// CAS revision of the document
+    cas: u64,
+    /// When the document should expire (nanoseconds)
+    expires-in-ns: u64,
+    /// Whether to preserve expiration values set on any documents modified by the query
+    preserve-expiry: bool,
+    /// (Deprecated)
+    /// Traditional durability settings for persistence, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    persist-to: u64,
+    /// (Deprecated)
+    /// Traditional durability settings for replication, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    replicate-to: u64,
+    /// Durability level for the mutation
+    ///
+    /// (this should be used instead of persist-to/replicate-to)
+    durability-level: durability-level,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  ///
+  /// Document - Upsert ///
+  ///
+  /// Options for performing a document upsert
+  record document-upsert-options {
+    /// When the document should expire (nanoseconds)
+    expires-in-ns: u64,
+    /// Whether to preserve expiration values set on any documents modified by the query
+    preserve-expiry: bool,
+    /// (Deprecated)
+    /// Traditional durability settings for persistence, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    persist-to: u64,
+    /// (Deprecated)
+    /// Traditional durability settings for replication, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    replicate-to: u64,
+    /// Durability level for the mutation
+    ///
+    /// (this should be used instead of persist-to/replicate-to)
+    durability-level: durability-level,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  ///
+  /// Document - Get ///
+  ///
+  /// Options for performing a document get
+  record document-get-options {
+    /// Whether expiry should also be retreived
+    with-expiry: bool,
+    /// Perform a projection of only specific paths of the result, returning only
+    /// the fields indicated by the given list of paths.
+    project: option<list<string>>,
+    /// Timeout that should be used, in nanoseconds
+    /// If not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// Level of replica read to enable
+    use-replica: option<replica-read-level>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Options for retrieving a document from any replica
+  record document-get-any-replica-options {
+    /// Timeout that should be used, in nanoseconds
+    /// If not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Options for retrieving a document from any replica
+  record document-get-all-replica-options {
+    /// Timeout that should be used, in nanoseconds
+    /// If not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Result of a successfully executed document get
+  record document-get-result {
+    /// Document that was retrieved
+    document: document,
+    /// CAS revision of the document
+    cas: u64,
+    /// When the document should expire (nanoseconds)
+    ///
+    /// Deprecated: use expires-at instead
+    expires-in-ns: option<u64>,
+    /// Time when the document expires
+    ///
+    /// This field may not be present if `document-get-options.with-expiry` is not set
+    expires-at: option<time>,
+  }
+
+  /// Result from a replica-aware document get
+  record document-get-replica-result {
+    /// Whether this document came from a replica server
+    is-replica: bool,
+    /// CAS revision of the document
+    cas: u64,
+    /// Document that was retrieved
+    document: document,
+    /// When the document should expire (nanoseconds)
+    ///
+    /// Deprecated: use expires-at instead
+    expires-in-ns: option<u64>,
+    /// Time when the document expires
+    ///
+    /// This field may not be present if `document-get-options.with-expiry` is not set
+    expires-at: option<time>,
+  }
+
+  ///
+  /// Document - Remove ///
+  ///
+  /// Options for performing a document remove
+  record document-remove-options {
+    /// CAS revision of the document
+    cas: u64,
+    /// (Deprecated)
+    /// Traditional durability settings for persistence, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    persist-to: u64,
+    /// (Deprecated)
+    /// Traditional durability settings for replication, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    replicate-to: u64,
+    /// Durability level for the mutation
+    ///
+    /// (this should be used instead of persist-to/replicate-to)
+    durability-level: durability-level,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  ///
+  /// Document - Get and Lock ///
+  ///
+  /// Options for performing a document lock
+  record document-get-and-lock-options {
+    /// Amount of time to lock the document (nanoseconds)
+    lock-time: u64,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  ///
+  /// Document - Unlock ///
+  ///
+  /// Options for performing a document lock
+  record document-unlock-options {
+    /// CAS revision of the document
+    cas: u64,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  ///
+  /// Document - Touch ///
+  ///
+  /// Options for performing a document lock
+  record document-touch-options {
+    /// Time until the document expires (nanoseconds)
+    expires-in: u64,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  ///
+  /// Document - Get and Touch ///
+  ///
+  /// Options for performing a document touch
+  record document-get-and-touch-options {
+    /// Time until the document expires (nanoseconds)
+    expires-in: u64,
+    /// Timeout that should be used, in nanoseconds
+    /// Even if a timeout is not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Insert a document with a new ID
+  insert: func(id: document-id, doc: document, options: option<document-insert-options>) -> result<mutation-metadata, document-error>;
+
+  /// Replace a document with the given ID with a new document
+  replace: func(id: document-id, doc: document, options: option<document-replace-options>) -> result<mutation-metadata, document-error>;
+
+  /// Create or update (replace) an existing document with the given ID
+  upsert: func(id: document-id, doc: document, options: option<document-upsert-options>) -> result<mutation-metadata, document-error>;
+
+  /// Retrieve a document by ID
+  get: func(id: document-id, options: option<document-get-options>) -> result<document-get-result, document-error>;
+
+  /// Retrieve a document by ID from any replica
+  get-any-repliacs: func(id: document-id, options: option<document-get-any-replica-options>) -> result<document-get-replica-result, document-error>;
+
+  /// Retrieve a document by ID from all replicas
+  get-all-replicas: func(id: document-id, options: option<document-get-all-replica-options>) -> result<list<document-get-replica-result>, document-error>;
+
+  /// Remove a document by ID
+  remove: func(id: document-id, options: option<document-remove-options>) -> result<mutation-metadata, document-error>;
+
+  /// Retrieve and Lock a document by ID
+  get-and-lock: func(id: document-id, options: option<document-get-and-lock-options>) -> result<document-get-result, document-error>;
+
+  /// Retrieve and Lock a document by ID
+  unlock: func(id: document-id, options: option<document-unlock-options>) -> result<_, document-error>;
+
+  /// Retrieve and Lock a document by ID
+  touch: func(id: document-id, options: option<document-touch-options>) -> result<mutation-metadata, document-error>;
+
+  /// Retrieve and Touch a document by ID
+  get-and-touch: func(id: document-id, options: option<document-get-and-touch-options>) -> result<document-get-result, document-error>;
+}
+
+/// Support Full Text Search (FTS) provided by Couchbase, which spans:
+/// - Vectors
+/// - Structured/Unstructured text
+/// - Dates
+/// - Numbers
+/// - CIDR notation
+/// - Geospatial data
+///
+/// Reference: https://docs.couchbase.com/server/current/search/search.html
+interface fts {
+  use types.{request-span, document, document-field-name, collection, sort-direction, bucket-error, search-index-name, retry-strategy, mutation-state, search-scan-consistency};
+
+  variant fts-bucket-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Buckets for use with FTS
+  ///
+  /// NOTE: This is unnecessary (and may be implemented as a no-op) for Couchbase versions greater than 6.5
+  resource fts-bucket {
+    constructor(name: string);
+    /// Wait until a bucket is ready to use
+    ///
+    /// This should be done on couchbase versions earlier than 6.5, before performing any search queries.
+    wait-until-ready: func() -> result<_, bucket-error>;
+  }
+
+  /// Errors that occur when creating an FTS index
+  variant fts-index-create-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Errors that occur when creating an FTS index
+  variant fts-bucket-create-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Errors that occur when performing an FTS search
+  variant fts-search-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Search facet
+  variant facet {
+    /// Term Facet
+    term(tuple<string, u64>),
+    /// Numeric Facet
+    numeric(tuple<string, u64>),
+    /// Date range
+    date-range(tuple<string, string, string>),
+  }
+
+  /// The type of highlighting to use for a query
+  enum search-highlight-style {
+    default,
+    /// Use HTML tags
+    html,
+    /// Use ANSI tags
+    ansi,
+  }
+
+  record search-highlight-options {
+    /// Style of highlighting to use for the query
+    style: search-highlight-style,
+    /// Fields to highlight
+    fields: list<string>,
+  }
+
+  /// Options to use when performing a search
+  record search-options {
+    /// Number of results to limit the search results by
+    limit: u32,
+    /// Level of data consistency desired for a search query
+    scan-consistency: search-scan-consistency,
+    /// Number of results to skip
+    skip: u32,
+    /// Enable explain on the search
+    explain: bool,
+    /// Enable highlighting on the search
+    highlight: option<search-highlight-options>,
+    /// Fields on documents in which to search
+    fields: list<document-field-name>,
+    /// Fields to sort by
+    sort: list<tuple<document-field-name, sort-direction>>,
+    facets: list<tuple<document-field-name, facet>>,
+    consistent-with: mutation-state,
+    /// Whether to disable scoring
+    disable-scoring: bool,
+    /// Nanoseconds until the search operation should time out
+    timeout-ns: u64,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+    /// Collections in which to search
+    collections: list<collection>,
+  }
+
+  /// Representation of all valid search queries meant to be used on text that can be used with Couchbase
+  variant text-search-query {
+    /// Match query
+    match(string),
+    /// Regexp query
+    regexp(string),
+    /// query string query
+    %string(string),
+    /// Numeric Range query
+    numeric-range(string),
+    /// Date Range query
+    date-range(string),
+    /// Conjunction query (AND)
+    conjunction(string),
+    /// Disjunction query (OR)
+    disjunction(string),
+    /// Boolean
+    boolean(string),
+    /// Wildcard query
+    wildcard(string),
+    /// Document ID query
+    document-id(string),
+    /// Boolean field query
+    boolean-field(string),
+    /// Term query
+    term(string),
+    /// Phrase query
+    phrase(string),
+    /// Prefix query
+    prefix(string),
+    /// Match-all query
+    match-all(string),
+    /// Match-none query
+    match-none(string),
+    /// Term-range query
+    term-range(string),
+    /// Geospatial distance query
+    geo-distance(string),
+    /// Geospatial bounding box query
+    geo-bounding-box(string),
+    /// Geospatial polygon query
+    geo-polygon(string),
+  }
+
+  /// How to combine searches in a vector search (see vector-search-query)
+  enum vector-search-combination-method {
+    unknown,
+    and,
+    or,
+  }
+
+  /// Options for performing a vector search query
+  ///
+  /// WARNING: this API is subject to change
+  record vector-search-query {
+    /// Queries to perform
+    queries: list<text-search-query>,
+    /// How to combine queries
+    combination: vector-search-combination-method,
+  }
+
+  /// Search query
+  variant search-query {
+    /// Text search
+    text(text-search-query),
+    /// Vector search query
+    ///
+    /// WARNING: this API is subject to change
+    vector(vector-search-query),
+  }
+
+  /// Perform a search, using an existing FTS index
+  search: func(index: search-index-name, query: search-query, options: option<search-options>) -> result<list<document>, fts-search-error>;
+}
+
+/// Supports arbitrary queries written in SQL++ (formerly known as N1QL) on a Couchbase cluster.
+///
+/// Reference: https://docs.couchbase.com/server/current/n1ql/n1ql-language-reference/index.html
+interface sqlpp {
+  use types.{mutation-state, query-scan-consistency, query-profile-mode, retry-strategy, request-span};
+  use sqlpp-types.{sqlpp-value, sqlpp-query-error};
+
+  /// Status of a SQL++ query
+  enum sqlpp-query-status {
+    unknown,
+    running,
+    success,
+    errors,
+    completed,
+    stopped,
+    timeout,
+    closed,
+    fatal,
+    aborted,
+  }
+
+  /// Query metrics
+  record sqlpp-query-metrics {
+    elapsed-time-ns: u64,
+    execution-time-ns: u64,
+    result-count: u64,
+    result-size: u64,
+    mutation-count: u64,
+    sort-count: u64,
+    error-count: u64,
+    warning-count: u64,
+  }
+
+  /// Warnings on SQL queries
+  record sqlpp-query-warning {
+    code: u32,
+    message: string,
+  }
+
+  /// Options usable when performing a SQL++ query
+  record sqlpp-query-options {
+    scan-consistency: query-scan-consistency,
+    consistent-with: option<mutation-state>,
+    /// Whether or not to profile the query
+    profile: option<query-profile-mode>,
+    /// Maximum buffered channel size between indexer connection manager and query service
+    /// when performing index scans
+    scan-cap: u32,
+    /// Controls the nubmer of items execution operators can batch for Fetch from KV
+    pipeline-batch: u32,
+    /// Controls the nubmer of items execution operators can buffer between various operators
+    pipeline-cap: u32,
+    /// How long the indexer is allowed to wait until it can satisfy consistency criteria (in nanoseconds)
+    scan-wait-ns: u64,
+    /// Whether the query is readonly
+    readonly: bool,
+    /// Number of index partitions to use when computing aggregations in parallel
+    max-parallelism: u32,
+    /// Unique ID for this query which is used by connection manager and the server
+    /// A generated UUID value will be assigned if this value is not provided
+    client-context-id: option<string>,
+    /// Whether to enable metrics collection
+    metrics: bool,
+    /// Whether the query is adhoc
+    ad-hoc: bool,
+    /// Timeout on the query in nanoseconds
+    timeout-ns: u64,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+    /// Whether to preserve expiration values set on any documents modified by the query
+    preserve-expiry: bool,
+    /// Whether to use a flex a index (i.e. using the search service)
+    use-flex-index: bool,
+  }
+
+  /// Perform a N1QL query
+  ///
+  /// Note: you may *only* use positional parameters in your query
+  query: func(query: string, params: list<sqlpp-value>, options: option<sqlpp-query-options>) -> result<sqlpp-value, sqlpp-query-error>;
+}
+
+/// Perform sub-document lookup operations on Documents stored in a Couchbase cluster
+///
+/// Reference: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#retrieving
+interface subdocument-lookup {
+  use types.{document-id, request-span, document, subdocument-path, document-error, retry-strategy, mutation-metadata};
+
+  /// Options for performing a lookup
+  record lookup-get-options {
+    /// Whether the lookup refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  type lookup-exists-options = lookup-get-options;
+
+  type lookup-count-options = lookup-get-options;
+
+  /// Types of different lookup operations that can be specified
+  variant lookup-operation {
+    /// Whether the particular path exists
+    exists(tuple<subdocument-path, lookup-exists-options>),
+    /// Whether the particular path exists
+    get(tuple<subdocument-path, lookup-get-options>),
+    /// Whether the particular path exists
+    count(tuple<subdocument-path, lookup-count-options>),
+  }
+
+  /// Errors that occur during lookup operation
+  variant lookup-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Options that control the lookup operation
+  record lookup-options {
+    /// Timeout that should be used, in nanoseconds
+    /// If not specified, the implementer *may* provide a default timeout.
+    timeout-ns: option<u64>,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+  }
+
+  /// Documents that are returned from lookup-in operations
+  record lookup-in-document {
+    /// CAS revision of the document
+    cas: u64,
+    /// Value that was retrieved
+    document: document,
+  }
+
+  /// Documents that are returned from lookup-in operations on replicas
+  record lookup-in-replica-document {
+    /// CAS revision of the document
+    cas: u64,
+    /// Whether this document came from a replica server
+    is-replica: bool,
+    /// Value that was retrieved
+    document: document,
+  }
+
+  /// Errors that occur during lookup for an individual subdocument path
+  variant subdocument-lookup-error {
+    /// The provided path does not exist in the document
+    path-does-not-exist(string),
+    /// Type Conflict between the path in the document and path command
+    path-mismatch(string),
+    /// A document error
+    document-error(document-error),
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Perform a lookup of one or more specs in a given document
+  lookup: func(id: document-id, operations: list<lookup-operation>, options: lookup-options) -> result<list<result<lookup-in-document, subdocument-lookup-error>>, lookup-error>;
+
+  /// Perform a lookup on a particular document from any replica server
+  lookup-in-any-replicas: func(id: document-id, operations: list<lookup-operation>, options: lookup-options) -> result<list<result<lookup-in-replica-document, subdocument-lookup-error>>, lookup-error>;
+
+  /// Perform a lookup on a particular document from all replica servers
+  lookup-in-all-replicas: func(id: document-id, operations: list<lookup-operation>, options: lookup-options) -> result<list<list<result<lookup-in-replica-document, subdocument-lookup-error>>>, lookup-error>;
+}
+
+/// Perform sub-document mutation operations on Documents stored in a Couchbase cluster
+///
+/// Reference: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#mutating
+interface subdocument-mutate {
+  use types.{document-id, request-span, document, durability-level, subdocument-path, document-error, retry-strategy, replica-read-level};
+
+  /// Semantics to use for document level actions during mutation
+  enum store-semantics {
+    /// Replace the document
+    replace,
+    /// Replace the document or create if it doesn't exist
+    upsert,
+    /// Create the document, failing if it doesn't exist
+    insert,
+  }
+
+  /// Options for performing an insert mutation operation
+  record insert-options {
+    /// Whether the path should be created
+    create-path: bool,
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  /// Options for performing an upsert mutation operation
+  record upsert-options {
+    /// Whether the path should be created
+    create-path: bool,
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  /// Options for performing an replace mutation operation
+  record replace-options {
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  /// Options for performing an remove mutation operation
+  record remove-options {
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  /// Options for performing an array append mutation operation
+  record array-append-options {
+    /// Whether the path should be created
+    create-path: bool,
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  /// Options for performing an array insert mutation operation
+  record array-insert-options {
+    /// Whether the path should be created
+    create-path: bool,
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  /// Options for performing an array prepend mutation operation
+  record array-prepend-options {
+    /// Whether the path should be created
+    create-path: bool,
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  /// Options for performing an array add mutation operation
+  record array-add-unique-options {
+    /// Whether the path should be created
+    create-path: bool,
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: bool,
+  }
+
+  /// Options for performing an operations on counters
+  record counter-operation-options {
+    /// Whether the path should be created
+    create-path: bool,
+    /// Whether the mutate refers to an extended attribute, rather than the document itself
+    xattr: option<bool>,
+  }
+
+  type decrement-options = counter-operation-options;
+
+  type increment-options = counter-operation-options;
+
+  /// Operations that can be performed when mutating
+  variant mutate-operation {
+    /// Insert a value at the specified path within a document
+    insert(tuple<subdocument-path, document, insert-options>),
+    /// Upsert a value into an existing document at the given path
+    upsert(tuple<subdocument-path, document, upsert-options>),
+    /// Replace the value at the given path
+    replace(tuple<subdocument-path, document, replace-options>),
+    /// Remove the field at the given path
+    remove(tuple<subdocument-path, remove-options>),
+    /// Increment a counter value
+    increment(tuple<subdocument-path, s64, increment-options>),
+    /// Decrement a counter value
+    decrement(tuple<subdocument-path, s64, decrement-options>),
+    /// Perform a dictionary add unique operation
+    array-add-unique(tuple<subdocument-path, array-add-unique-options>),
+    /// Add an element to the end (i.e. right) of an array
+    array-append(tuple<tuple<subdocument-path, document>, array-append-options>),
+    /// Add multiple element to the end (i.e. right) of an array
+    array-append-multi(tuple<list<tuple<subdocument-path, document>>, array-append-options>),
+    /// Insert an element into an array, at a given position which is specified as part of the path
+    /// (ex. 'path.to.array[3]')
+    array-insert(tuple<tuple<subdocument-path, document>, array-insert-options>),
+    /// Insert multiple elements into an array, at a given position which is specified as part of the path
+    /// (ex. 'path.to.array[3]')
+    array-insert-multi(tuple<list<tuple<subdocument-path, document>>, array-insert-options>),
+    /// Add an element to the beginning (i.e. left) of an array
+    array-prepend(tuple<tuple<subdocument-path, document>, array-prepend-options>),
+    /// Add multiple elements to the beginning (i.e. left) of an array
+    array-prepend-multi(tuple<list<tuple<subdocument-path, document>>, array-prepend-options>),
+  }
+
+  /// Errors that occur during mutate batch operations
+  variant mutate-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Errors that occur during mutate for an individual subdocument path
+  variant subdocument-mutate-error {
+    /// The path already exists (ex. during an insert)
+    path-already-exists(string),
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Options for performing batches of mutation
+  record mutate-options {
+    /// Nanoseconds until the mutation operation should expire
+    expires-in-ms: u64,
+    /// Nanoseconds until the mutation operation should time out
+    timeout-ns: u64,
+    /// CAS revision of the document
+    cas: u64,
+    /// Durability level for the mutation
+    ///
+    /// (this should be used instead of persist-to/replicate-to)
+    durability-level: durability-level,
+    /// Semantics on the store
+    ///
+    /// (this should be used instead of persist-to/replicate-to)
+    store-semantics: store-semantics,
+    /// How and whether to retry the operation
+    retry-strategy: option<retry-strategy>,
+    /// A known span to associate this lookup with
+    parent-span: option<request-span>,
+    /// Level of replica read to enable
+    use-replica: option<replica-read-level>,
+    /// Whether to preserve expiry
+    preserve-expiry: bool,
+    /// (Deprecated)
+    /// Traditional durability settings for persistence, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    persist-to: u64,
+    /// (Deprecated)
+    /// Traditional durability settings for replication, only usable from Couchbase versions earlier than 6.0
+    ///
+    /// See: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#1.6@go-sdk::durability.adoc
+    replicate-to: u64,
+  }
+
+  /// Metadata related to any mutation on a Couchbase collection (ex. CRUD operations)
+  ///
+  /// todo(fix): mutation-metadata is included for a second time here because wit-bindgen
+  /// does not currently correctly pull the definition in the types interface.
+  record mutation-metadata {
+    /// CAS revision of the document
+    cas: u64,
+    /// The bucket on which the mutation was performed
+    bucket: string,
+    /// The ID of the vbucket (partition) that the operation was performed on
+    partition-id: u64,
+    /// The UUID of the vbucket (partition) that the operation was performed on
+    partition-uuid: u64,
+    /// The sequence number of the operation performed on the vbucket (partition)
+    seq: u64,
+  }
+
+  /// Result of a successfully executed mutation operation
+  record mutation-result {
+    /// End result of the mutation
+    document: document,
+    /// Metadata related to the mutation
+    metadata: mutation-metadata,
+  }
+
+  /// Perform a mutate of one or more specs in a given document
+  mutate: func(id: document-id, operations: list<mutate-operation>, options: mutate-options) -> result<list<result<mutation-result, subdocument-mutate-error>>, mutate-error>;
+}
+
+/// Perform transactions that contain multiple operations, comprising:
+/// - Key-Value operations
+/// - SQL++ queries
+///
+/// Reference: https://docs.couchbase.com/go-sdk/current/howtos/subdocument-operations.html#retrieving
+interface transactions {
+  use types.{document-id, request-span, document, subdocument-path, document-error, retry-strategy, mutation-metadata, query-scan-consistency, query-profile-mode, collection, time};
+  use sqlpp.{sqlpp-value, sqlpp-query-status, sqlpp-query-metrics, sqlpp-query-warning};
+
+  /// A token representing a transaction (pseudo resource)
+  ///
+  /// NOTE: In future versions with more widespred WIT Resource support,
+  /// this transaction will turn into a transaction resource.
+  type tx-token = string;
+
+  /// Errors that occur when trying to create a transaction
+  variant create-tx-error {
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Errors that occur while performing an operation inside a given transaction
+  variant tx-error {
+    /// Transaction has expired
+    expired,
+    /// Transaction has (already) failed
+    failed,
+    /// Transaction failed after committing
+    failed-post-commit,
+    /// Invalid/unknown transaction
+    invalid-tx,
+    /// A completely unexpected error
+    unexpected(string),
+  }
+
+  /// Result of a successfully executed document get
+  record tx-document-get-result {
+    /// Document that was retrieved
+    document: document,
+    /// CAS revision of the document
+    cas: u64,
+    /// When the document should expire (nanoseconds)
+    ///
+    /// Deprecated: use expires-at instead
+    expires-in-ns: option<u64>,
+    /// Time when the document expires
+    ///
+    /// This field may not be present if `document-get-options.with-expiry` is not set
+    expires-at: option<time>,
+    /// ID for metadata related to the operation
+    ///
+    /// This ID is provided by and used by the implementer to manage in-tx metadata,
+    /// and should not be manipulated by callers but rather passed verbatim.
+    tx-metadata-id: string,
+  }
+
+  /// Options to perform a query inside a transaction
+  record transaction-query-options {
+    scan-consistency: query-scan-consistency,
+    /// Whether or not to profile the query
+    profile: option<query-profile-mode>,
+    /// Maximum buffered channel size between indexer connection manager and query service
+    /// when performing index scans
+    scan-cap: u32,
+    /// Controls the nubmer of items execution operators can batch for Fetch from KV
+    pipeline-batch: u32,
+    /// Controls the nubmer of items execution operators can buffer between various operators
+    pipeline-cap: u32,
+    /// How long the indexer is allowed to wait until it can satisfy consistency criteria (in nanoseconds)
+    scan-wait-ns: u64,
+    /// Whether the query is readonly
+    readonly: bool,
+    /// Unique ID for this query which is used by connection manager and the server
+    /// A generated UUID value will be assigned if this value is not provided
+    client-context-id: option<string>,
+  }
+
+  /// A token representing a SQL++ query result inside a transaction (pseudo resource)
+  ///
+  /// NOTE: In future versions with more widespred WIT Resource support,
+  /// this transaction will turn into a transaction resource.
+  type tx-sqlpp-query-result-token = string;
+
+  /// Information regarding the result of committing a transaction
+  record tx-result {
+    /// UUID assigned to the transaction
+    id: string,
+    /// Whether the transaction was successfully unstaged, or if a later
+    /// cleanup job will be responsible
+    unstaging-complete: bool,
+  }
+
+  /// Metadata for a SQL++ query performed during a transaction
+  record tx-sqlpp-query-metadata {
+    request-id: string,
+    /// Unique ID for this query which is used by connection manager and the server
+    client-context-id: string,
+    status: sqlpp-query-status,
+    metrics: sqlpp-query-metrics,
+    warnings: list<sqlpp-query-warning>,
+  }
+
+  /// Create a transaction
+  create-tx: func() -> result<tx-token, create-tx-error>;
+
+  /// Retrieve a document, inside a transaction
+  tx-document-get: func(tx: tx-token, collection: collection, id: document-id) -> result<tx-document-get-result, tx-error>;
+
+  /// Insert a document, inside a transaction
+  tx-document-insert: func(tx: tx-token, id: document-id, document: document) -> result<tx-document-get-result, tx-error>;
+
+  /// Replace a document, inside a transaction
+  tx-document-replace: func(tx: tx-token, old: tx-document-get-result, new: document) -> result<tx-document-get-result, tx-error>;
+
+  /// Remove a document, inside a transaction
+  tx-document-remove: func(tx: tx-token, doc: tx-document-get-result) -> result<_, tx-error>;
+
+  /// Perform a SQL++ query, inside a transaction
+  ///
+  /// Note: you may *only* use positional parameters in our query
+  tx-sqlpp-query: func(tx: tx-token, stmt: string, params: list<sqlpp-value>, options: transaction-query-options) -> result<tx-sqlpp-query-result-token, tx-error>;
+
+  /// Retrieve the next value in the query
+  tx-sqlpp-query-next: func(query: tx-sqlpp-query-result-token) -> option<document>;
+
+  /// Retrieve the metadata from the query
+  tx-sqlpp-query-get-metadata: func(query: tx-sqlpp-query-result-token) -> result<tx-sqlpp-query-metadata, tx-error>;
+
+  /// Commit a given transaction
+  tx-commit: func(tx: tx-token) -> result<_, tx-error>;
+}
+
