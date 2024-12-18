@@ -1,30 +1,27 @@
 wit_bindgen::generate!({ generate_all });
 
-use exports::wasi::http::incoming_handler::Guest;
-use wasi::http::types::*;
+use std::io::Read;
+
+use wasmcloud_component::http::{self, ErrorCode};
 use wasmcloud::couchbase::document as rustcb;
 
 const KEY: &str = "demodoc";
 
-struct HttpServer;
+struct Component;
 
-impl Guest for HttpServer {
-    fn handle(request: IncomingRequest, response_out: ResponseOutparam) {
-        let response = OutgoingResponse::new(Fields::new());
-        response.set_status_code(200).unwrap();
+http::export!(Component);
 
-        let body = request
-            .consume()
-            .unwrap()
-            .stream()
-            .unwrap()
-            .blocking_read(u64::MAX)
-            .unwrap();
+impl http::Server for Component {
+    fn handle(
+        request: http::IncomingRequest
+    ) -> http::Result<http::Response<impl http::OutgoingBody>> {
+        let (path, mut body) = request.into_parts();
 
-        let document_id = request
-            .path_with_query()
+        // Get document id
+        let document_id = path.uri
+            .path_and_query()
             .map(|s| {
-                let id = s.trim_start_matches('/').to_string();
+                let id = s.path().trim_start_matches('/').to_string();
                 if id.is_empty() {
                     KEY.to_string()
                 } else {
@@ -33,37 +30,48 @@ impl Guest for HttpServer {
             })
             .unwrap_or_else(|| KEY.to_string());
 
-        let document = rustcb::Document::Raw(String::from_utf8_lossy(&body).to_string());
-        // Store document
-        if rustcb::upsert(&document_id, document, None).is_err() {
-            send_response(response, "Failed to upsert document", response_out);
-            return;
+        // Get document body
+        let mut document_body = Vec::new();
+        if body.read_to_end(&mut document_body).is_err() {
+            return http::Response::builder()
+                .status(500)
+                .body("Failed to read http body".into())
+                .map_err(|e| {
+                    ErrorCode::InternalError(Some(format!("failed to build response {e:?}")))
+                });
         }
-        // Retrieve document
-        let document = rustcb::get(&document_id, None);
-        let Ok(rustcb::Document::Raw(value)) = document.map(|doc| doc.document) else {
-            send_response(response, "Error decoding value", response_out);
-            return;
+        let document = rustcb::Document::Raw(String::from_utf8(document_body).expect("Failed to read http body"));
+
+        // Upsert document
+        if rustcb::upsert(&document_id, document, None).is_err() {
+            return http::Response::builder()
+                .status(500)
+                .body("Failed to upsert document".into())
+                .map_err(|e| {
+                    ErrorCode::InternalError(Some(format!("failed to build response {e:?}")))
+                });
+        }
+
+        // Get document
+        let res = rustcb::get(&document_id, None);
+        if res.is_err() {
+            return http::Response::builder()
+                .status(500)
+                .body("Failed to get document".into())
+                .map_err(|e| {
+                    ErrorCode::InternalError(Some(format!("failed to build response {e:?}")))
+                });
+        }
+        let Ok(rustcb::Document::Raw(value)) = res.map(|doc| doc.document) else {
+            return http::Response::builder()
+                .status(500)
+                .body("Failed to read get document".into())
+                .map_err(|e| {
+                    ErrorCode::InternalError(Some(format!("failed to build response {e:?}")))
+                });
         };
 
-        send_response(response, value, response_out);
+        // Write HTTP response
+        Ok(http::Response::new(value))
     }
 }
-
-fn send_response(
-    response: OutgoingResponse,
-    bytes: impl AsRef<[u8]>,
-    response_out: ResponseOutparam,
-) {
-    let response_body = response.body().unwrap();
-    ResponseOutparam::set(response_out, Ok(response));
-    response_body
-        .write()
-        .unwrap()
-        .blocking_write_and_flush(bytes.as_ref())
-        .unwrap();
-
-    OutgoingBody::finish(response_body, None).expect("failed to finish response body");
-}
-
-export!(HttpServer);
