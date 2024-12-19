@@ -74,4 +74,4 @@ jobs:
           WASH_REG_USER: ${{ github.repository_owner }}
           WASH_REG_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          wash push ghcr.io/${{ github.repository_owner }}/providers/couchbase-test:${{ steps.meta.outputs.version }} build/wasmcloud-provider-couchbase.par.gz
+          wash push ghcr.io/${{ github.repository_owner }}/wasmcloud/providers/couchbase:${{ steps.meta.outputs.version }} build/wasmcloud-provider-couchbase.par.gz
