@@ -1,4 +1,4 @@
-package main
+package couchbase
 
 import (
 	"github.com/couchbase/gocb/v2"
