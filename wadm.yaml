@@ -62,6 +62,29 @@ spec:
                     key: couchbase_password
               config:
                 - name: couchbase-provider_config
+    - name: keyvalue
+      type: component
+      properties:
+        image: ghcr.io/wasmcloud/components/http-keyvalue-counter-rust:0.1.0
+      traits:
+        - type: spreadscaler
+          properties:
+            replicas: 100
+        # Link the component to the provider on wasi-keyvalue
+        - type: link
+          properties:
+            namespace: wasi
+            package: keyvalue
+            interfaces: [atomics, store]
+            target:
+              name: couchbase
+              secrets:
+                - name: password
+                  properties:
+                    policy: nats-kv
+                    key: couchbase_password
+              config:
+                - name: couchbase-provider_config
 
     - name: couchbase
       type: capability
@@ -78,6 +101,7 @@ spec:
         # to listen on port 8080 for incoming requests
         - type: link
           properties:
+            name: rust-link
             target: rust
             namespace: wasi
             package: http
@@ -89,6 +113,7 @@ spec:
                     address: 127.0.0.1:8080
         - type: link
           properties:
+            name: go-link
             target: golang
             namespace: wasi
             package: http
@@ -98,3 +123,15 @@ spec:
                 - name: 8081-http
                   properties:
                     address: 127.0.0.1:8081
+        - type: link
+          properties:
+            name: kv-link
+            target: keyvalue
+            namespace: wasi
+            package: http
+            interfaces: [incoming-handler]
+            source:
+              config:
+                - name: 8082-http
+                  properties:
+                    address: 127.0.0.1:8082
