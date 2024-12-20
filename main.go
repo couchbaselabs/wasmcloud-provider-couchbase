@@ -13,6 +13,7 @@ import (
 	wrpc "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase-examples/wasmcloud-provider-couchbase/provider"
 	"github.com/couchbase-examples/wasmcloud-provider-couchbase/provider/couchbase"
+	"github.com/couchbase-examples/wasmcloud-provider-couchbase/provider/keyvalue"
 	sdk "go.wasmcloud.dev/provider"
 )
 
@@ -60,6 +61,8 @@ func run() error {
 	// Handle RPC operations
 	stopFunc, err := wrpc.Serve(
 		p.RPCClient,
+		keyvalue.New(linkHandler),
+		keyvalue.New(linkHandler),
 		couchbase.New(linkHandler),
 	)
 	if err != nil {
