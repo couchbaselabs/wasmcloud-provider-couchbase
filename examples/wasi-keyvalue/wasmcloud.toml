@@ -1,8 +1,0 @@
-name = "Couchbase WASI KV"
-language = "go"
-type = "provider"
-version = "0.1.0"
-
-[provider]
-vendor = "wasmCloud"
-bin_name = "wasmcloud-provider-couchbase"
