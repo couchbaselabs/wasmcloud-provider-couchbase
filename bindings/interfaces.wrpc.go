@@ -4,11 +4,13 @@ package interfaces
 
 import (
 	exports__wasmcloud__couchbase__document "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings/exports/wasmcloud/couchbase/document"
+	exports__wrpc__keyvalue__atomics "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings/exports/wrpc/keyvalue/atomics"
+	exports__wrpc__keyvalue__store "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings/exports/wrpc/keyvalue/store"
 	wrpc "wrpc.io/go"
 )
 
-func Serve(s wrpc.Server, h0 exports__wasmcloud__couchbase__document.Handler) (stop func() error, err error) {
-	stops := make([]func() error, 0, 1)
+func Serve(s wrpc.Server, h0 exports__wrpc__keyvalue__store.Handler, h1 exports__wrpc__keyvalue__atomics.Handler, h2 exports__wasmcloud__couchbase__document.Handler) (stop func() error, err error) {
+	stops := make([]func() error, 0, 3)
 	stop = func() error {
 		for _, stop := range stops {
 			if err := stop(); err != nil {
@@ -17,13 +19,29 @@ func Serve(s wrpc.Server, h0 exports__wasmcloud__couchbase__document.Handler) (s
 		}
 		return nil
 	}
-	stop0, err := exports__wasmcloud__couchbase__document.ServeInterface(s, h0)
+	stop0, err := exports__wrpc__keyvalue__store.ServeInterface(s, h0)
 	if err != nil {
 		return
 	}
 	stops = append(stops, stop0)
+	stop1, err := exports__wrpc__keyvalue__atomics.ServeInterface(s, h1)
+	if err != nil {
+		return
+	}
+	stops = append(stops, stop1)
+	stop2, err := exports__wasmcloud__couchbase__document.ServeInterface(s, h2)
+	if err != nil {
+		return
+	}
+	stops = append(stops, stop2)
 	stop = func() error {
 		if err := stop0(); err != nil {
+			return err
+		}
+		if err := stop1(); err != nil {
+			return err
+		}
+		if err := stop2(); err != nil {
 			return err
 		}
 		return nil
