@@ -1,4 +1,4 @@
-package provider
+package couchbase
 
 import (
 	// Generated bindings

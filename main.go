@@ -12,6 +12,7 @@ import (
 
 	wrpc "github.com/couchbase-examples/wasmcloud-provider-couchbase/bindings"
 	"github.com/couchbase-examples/wasmcloud-provider-couchbase/provider"
+	"github.com/couchbase-examples/wasmcloud-provider-couchbase/provider/couchbase"
 	sdk "go.wasmcloud.dev/provider"
 )
 
@@ -37,27 +38,30 @@ func run() error {
 	}()
 
 	// Initialize the provider with callbacks to track linked components
-	providerHandler := provider.NewLinkHandler()
+	linkHandler := provider.NewLinkHandler()
 
 	p, err := sdk.New(
-		sdk.TargetLinkPut(providerHandler.HandleNewTargetLink),
-		sdk.TargetLinkDel(providerHandler.HandleDelTargetLink),
-		sdk.HealthCheck(providerHandler.HandleHealthCheck),
-		sdk.Shutdown(providerHandler.HandleShutdown),
+		sdk.TargetLinkPut(linkHandler.HandleNewTargetLink),
+		sdk.TargetLinkDel(linkHandler.HandleDelTargetLink),
+		sdk.HealthCheck(linkHandler.HandleHealthCheck),
+		sdk.Shutdown(linkHandler.HandleShutdown),
 	)
 	if err != nil {
 		return err
 	}
 
 	// Store the provider for use in the handlers
-	providerHandler.WasmcloudProvider = p
+	linkHandler.WasmcloudProvider = p
 
 	// Setup two channels to await RPC and control interface operations
 	providerCh := make(chan error, 1)
 	signalCh := make(chan os.Signal, 1)
 
 	// Handle RPC operations
-	stopFunc, err := wrpc.Serve(p.RPCClient, providerHandler)
+	stopFunc, err := wrpc.Serve(
+		p.RPCClient,
+		couchbase.New(linkHandler),
+	)
 	if err != nil {
 		p.Shutdown()
 		return err
