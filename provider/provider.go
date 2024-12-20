@@ -1,11 +1,13 @@
-package main
+package provider
 
 import (
 	"context"
 	"errors"
 	"time"
 
+	gocbt "github.com/couchbase/gocb-opentelemetry"
 	"github.com/couchbase/gocb/v2"
+	"go.opentelemetry.io/otel"
 	sdk "go.wasmcloud.dev/provider"
 	wrpc "wrpc.io/go"
 	wrpcnats "wrpc.io/go/nats"
@@ -35,6 +37,70 @@ type Handler struct {
 
 	// map that stores couchbase cluster connections
 	clusterConnections map[string]*gocb.Collection
+}
+
+func NewLinkHandler() *Handler {
+	return &Handler{
+		linkedFrom:         make(map[string]map[string]string),
+		clusterConnections: make(map[string]*gocb.Collection),
+	}
+}
+
+// Provider handler functions
+func (h *Handler) HandleNewTargetLink(link sdk.InterfaceLinkDefinition) error {
+	h.Logger.Info("Handling new target link", "link", link)
+	h.linkedFrom[link.SourceID] = link.TargetConfig
+	couchbaseConnectionArgs, err := validateCouchbaseConfig(link.TargetConfig, link.TargetSecrets)
+	if err != nil {
+		h.Logger.Error("Invalid couchbase target config", "error", err)
+		return err
+	}
+	h.updateCouchbaseCluster(link.SourceID, couchbaseConnectionArgs)
+	return nil
+}
+
+func (h *Handler) updateCouchbaseCluster(sourceId string, connectionArgs CouchbaseConnectionArgs) {
+	// Connect to the cluster
+	cluster, err := gocb.Connect(connectionArgs.ConnectionString, gocb.ClusterOptions{
+		Username: connectionArgs.Username,
+		Password: connectionArgs.Password,
+		Tracer:   gocbt.NewOpenTelemetryRequestTracer(otel.GetTracerProvider()),
+	})
+	if err != nil {
+		h.Logger.Error("unable to connect to couchbase cluster", "error", err)
+		return
+	}
+	var collection *gocb.Collection
+	if connectionArgs.CollectionName != "" && connectionArgs.ScopeName != "" {
+		collection = cluster.Bucket(connectionArgs.BucketName).Scope(connectionArgs.ScopeName).Collection(connectionArgs.CollectionName)
+	} else {
+		collection = cluster.Bucket(connectionArgs.BucketName).DefaultCollection()
+	}
+
+	bucket := cluster.Bucket(connectionArgs.BucketName)
+	if err = bucket.WaitUntilReady(5*time.Second, nil); err != nil {
+		h.Logger.Error("unable to connect to couchbase bucket", "error", err)
+	}
+
+	// Store the connection
+	h.clusterConnections[sourceId] = collection
+}
+
+func (h *Handler) HandleDelTargetLink(link sdk.InterfaceLinkDefinition) error {
+	h.Logger.Info("Handling del target link", "link", link)
+	delete(h.linkedFrom, link.Target)
+	return nil
+}
+
+func (h *Handler) HandleHealthCheck() string {
+	h.Logger.Debug("Handling health check")
+	return "provider healthy"
+}
+
+func (h *Handler) HandleShutdown() error {
+	h.Logger.Info("Handling shutdown")
+	// clear(handler.linkedFrom)
+	return nil
 }
 
 func (h *Handler) Get(ctx context.Context, id string, options *document.DocumentGetOptions) (*wrpc.Result[document.DocumentGetResult, types.DocumentError], error) {

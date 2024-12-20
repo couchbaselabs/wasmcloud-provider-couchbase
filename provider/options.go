@@ -1,4 +1,4 @@
-package main
+package provider
 
 import (
 	// Generated bindings
@@ -91,7 +91,7 @@ func ReplaceOptions(o *document.DocumentReplaceOptions) *gocb.ReplaceOptions {
 		return &gocb.ReplaceOptions{Transcoder: gocb.NewRawStringTranscoder()}
 	}
 	return &gocb.ReplaceOptions{
-		Timeout: time.Duration(*o.TimeoutNs),
+		Timeout:    time.Duration(*o.TimeoutNs),
 		Transcoder: gocb.NewRawStringTranscoder(),
 	}
 }
