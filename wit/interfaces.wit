@@ -1,9 +1,9 @@
-package wasmcloud:provider-keyvalue-couchbase;
+package wasmcloud:couchbase@0.1.0-draft;
 
 world interfaces {
-    export wasmcloud:couchbase/document@0.1.0-draft;
-    // export wasmcloud:couchbase/fts@0.1.0-draft;
-    // export wasmcloud:couchbase/subdocument-lookup@0.1.0-draft;
-    // export wasmcloud:couchbase/subdocument-mutate@0.1.0-draft;
-    // export wasmcloud:couchbase/sqlpp@0.1.0-draft;
+    export document;
+    // export fts@0.1.0-draft;
+    // export subdocument-lookup@0.1.0-draft;
+    // export subdocument-mutate@0.1.0-draft;
+    // export sqlpp@0.1.0-draft;
 }
