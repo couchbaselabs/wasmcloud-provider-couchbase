@@ -250,5 +250,10 @@ func (h *Handler) getCollectionFromContext(ctx context.Context) (*gocb.Collectio
 		h.Logger.Warn("Received request from unlinked source", "sourceId", sourceId)
 		return nil, errors.New("received request from unlinked source")
 	}
-	return h.clusterConnections[sourceId], nil
+	connection := h.clusterConnections[sourceId]
+	if connection == nil {
+		h.Logger.Warn("Received request from unlinked source", "sourceId", sourceId)
+		return nil, errors.New("received request from unlinked source")
+	}
+	return connection, nil
 }
