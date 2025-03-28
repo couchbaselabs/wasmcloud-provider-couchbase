@@ -1,2 +1,2 @@
 [overrides]
-"wasmcloud:couchbase" = { path = "../../wit/couchbase" }
+"wasmcloud:couchbase" = { path = "../../wit" }

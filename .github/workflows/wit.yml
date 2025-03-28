@@ -17,7 +17,18 @@ jobs:
       - uses: taiki-e/cache-cargo-install-action@v2
         with:
           tool: wit-bindgen-cli
+      - name: create temporary wit directory
+        run: |
+          mkdir -p wit-test/wit
+          cp wit/interfaces.wit wit-test/wit/interfaces.wit
+          cat <<EOF > "wit-test/wit/deps.toml"
+          couchbase = "../../wit"
+          EOF
+
       - name: fetch WIT dependencies
+        working-directory: wit-test
         run: wit-deps
+
       - name: Run wit-bindgen to test WIT
+        working-directory: wit-test
         run: wit-bindgen markdown --out-dir /tmp wit/
