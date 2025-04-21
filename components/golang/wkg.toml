@@ -1,2 +1,0 @@
-[overrides]
-"wasmcloud:couchbase" = { path = "../../wit" }
