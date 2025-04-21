@@ -20,7 +20,14 @@ jobs:
       - name: create temporary wit directory
         run: |
           mkdir -p wit-test/wit
-          cp wit/interfaces.wit wit-test/wit/interfaces.wit
+          cat <<EOF > "wit-test/wit/world.wit"
+          package example:test@1.0.0;
+
+          world interfaces {
+              import wasmcloud:couchbase/document@0.1.0-draft;
+          }
+          EOF
+
           cat <<EOF > "wit-test/wit/deps.toml"
           couchbase = "../../wit"
           EOF
