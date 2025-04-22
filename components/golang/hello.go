@@ -1,3 +1,5 @@
+//go:generate go tool wit-bindgen-go generate --world hello --out gen ./wit
+
 package main
 
 import (
