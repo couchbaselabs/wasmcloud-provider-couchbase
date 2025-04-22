@@ -27,6 +27,7 @@ func (h *Handler) updateCouchbaseCluster(sourceId string, linkName string, conne
 	bucket := cluster.Bucket(connectionArgs.BucketName)
 	if err = bucket.WaitUntilReady(5*time.Second, nil); err != nil {
 		h.Logger.Error("unable to connect to couchbase bucket", "error", err)
+		return
 	}
 
 	var collection *gocb.Collection
@@ -40,6 +41,13 @@ func (h *Handler) updateCouchbaseCluster(sourceId string, linkName string, conne
 	}
 
 	// Store the connection
+	if h.clusterConnections == nil {
+		h.clusterConnections = make(map[string]map[string]*gocb.Collection)
+	}
+	if h.clusterConnections[sourceId] == nil {
+		h.clusterConnections[sourceId] = make(map[string]*gocb.Collection)
+	}
+
 	h.clusterConnections[sourceId][linkName] = collection
 }
 
@@ -51,16 +59,18 @@ func (h *Handler) handleNewTargetLink(link provider.InterfaceLinkDefinition) err
 		h.Logger.Error("Invalid couchbase target config", "error", err)
 		return err
 	}
-	// h.linkedFrom[link.SourceID] = link.TargetConfig
 	h.updateCouchbaseCluster(link.SourceID, link.Name, couchbaseConnectionArgs)
 	return nil
 }
 
 func (h *Handler) handleDelTargetLink(link provider.InterfaceLinkDefinition) error {
 	h.Logger.Info("Handling del target link", "link", link)
-	// delete(h.linkedFrom, link.Target)
-	// TODO: validate
-	delete(h.clusterConnections, link.SourceID)
+	if connections, exists := h.clusterConnections[link.SourceID]; exists {
+		delete(connections, link.Name)
+		if len(connections) == 0 {
+			delete(h.clusterConnections, link.SourceID)
+		}
+	}
 	return nil
 }
 
