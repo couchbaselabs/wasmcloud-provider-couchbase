@@ -4,6 +4,8 @@ package wasmcloud:couchbase@0.1.0-draft;
 ///
 /// Reference: https://docs.couchbase.com/c-sdk/current/concept-docs/documents.html
 interface document {
+  use wasi:io/poll@0.2.0.{pollable};
+
   use types.{
       document, document-id, document-error, mutation-metadata, time, durability-level, retry-strategy, request-span,
       replica-read-level
@@ -52,6 +54,19 @@ interface document {
     doc: document,
     options: option<document-insert-options>,
   ) -> result<mutation-metadata, document-error>;
+
+
+  resource insert-result-async {
+    ready: func() -> bool;
+
+    get: func() -> result<mutation-metadata, document-error>;
+  }
+
+  insert-async: func(
+    id: document-id,
+    doc: document,
+    options: option<document-insert-options>,
+  ) -> insert-result-async;
 
   //////////////////////////
   /// Document - Replace ///
@@ -249,6 +264,17 @@ interface document {
     id: document-id,
     options: option<document-get-options>,
   ) -> result<document-get-result, document-error>;
+
+  resource get-result-async {
+    ready: func() -> bool;
+
+    get: func() -> result<document-get-result, document-error>;
+  }
+
+  get-async: func(
+    id: document-id,
+    options: option<document-get-options>,
+  ) -> get-result-async;
 
   /// Retrieve a document by ID from any replica
   get-any-repliacs: func(
