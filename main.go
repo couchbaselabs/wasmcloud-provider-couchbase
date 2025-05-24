@@ -39,7 +39,7 @@ func run() error {
 	// Initialize the provider with callbacks to track linked components
 	providerHandler := Handler{
 		clusterConnections: make(map[string]map[string]*gocb.Collection),
-		asyncResult:        make(map[string]any),
+		asyncMap:           asyncMap{},
 	}
 
 	p, err := provider.New(

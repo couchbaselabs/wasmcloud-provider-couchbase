@@ -38,7 +38,7 @@ type Handler struct {
 	// sourceID -> linkName -> collection connection
 	clusterConnections map[string]map[string]*gocb.Collection
 
-	asyncResult map[string]any
+	asyncMap asyncMap
 }
 
 var _ document.Handler = &Handler{}
