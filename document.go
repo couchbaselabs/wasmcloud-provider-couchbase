@@ -37,7 +37,11 @@ type Handler struct {
 	// The map is of the following structure:
 	// sourceID -> linkName -> collection connection
 	clusterConnections map[string]map[string]*gocb.Collection
+
+	asyncResult map[string]any
 }
+
+var _ document.Handler = &Handler{}
 
 func (h *Handler) Get(ctx context.Context, id string, options *document.DocumentGetOptions) (*wrpc.Result[document.DocumentGetResult, types.DocumentError], error) {
 	collection, err := h.getCollectionFromContext(ctx)
