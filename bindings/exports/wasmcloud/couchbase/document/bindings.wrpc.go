@@ -757,6 +757,8 @@ func (v *DocumentUpsertOptions) WriteToIndex(w wrpc.ByteWriter) (func(wrpc.Index
 	return nil, nil
 }
 
+type UpsertResultAsync interface{}
+
 // Document - Get ///
 //
 // Options for performing a document get
@@ -2619,6 +2621,9 @@ type Handler interface {
 	Replace(ctx__ context.Context, id string, doc *wasmcloud__couchbase__types.Document, options *DocumentReplaceOptions) (*wrpc.Result[MutationMetadata, DocumentError], error)
 	// Create or update (replace) an existing document with the given ID
 	Upsert(ctx__ context.Context, id string, doc *wasmcloud__couchbase__types.Document, options *DocumentUpsertOptions) (*wrpc.Result[MutationMetadata, DocumentError], error)
+	UpsertResultAsync_Ready(ctx__ context.Context, self wrpc.Borrow[UpsertResultAsync]) (bool, error)
+	UpsertResultAsync_Get(ctx__ context.Context, self wrpc.Borrow[UpsertResultAsync]) (*wrpc.Result[MutationMetadata, DocumentError], error)
+	UpsertAsync(ctx__ context.Context, id string, doc *wasmcloud__couchbase__types.Document, options *DocumentUpsertOptions) (wrpc.Own[UpsertResultAsync], error)
 	// Retrieve a document by ID
 	Get(ctx__ context.Context, id string, options *DocumentGetOptions) (*wrpc.Result[DocumentGetResult, DocumentError], error)
 	GetResultAsync_Ready(ctx__ context.Context, self wrpc.Borrow[GetResultAsync]) (bool, error)
@@ -2641,7 +2646,7 @@ type Handler interface {
 }
 
 func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
-	stops := make([]func() error, 0, 17)
+	stops := make([]func() error, 0, 20)
 	stop = func() error {
 		for _, stop := range stops {
 			if err := stop(); err != nil {
@@ -5693,7 +5698,941 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	}
 	stops = append(stops, stop5)
 
-	stop6, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop6, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "upsert-result-async.ready", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+		defer func() {
+			if err := w.Close(); err != nil {
+				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+			}
+		}()
+		slog.DebugContext(ctx, "reading parameter", "i", 0)
+		p0, err := func(r interface {
+			io.ByteReader
+			io.Reader
+		}) (wrpc.Borrow[UpsertResultAsync], error) {
+			var x uint32
+			var s uint
+			for i := 0; i < 5; i++ {
+				slog.Debug("reading borrowed resource handle length byte", "i", i)
+				b, err := r.ReadByte()
+				if err != nil {
+					if i > 0 && err == io.EOF {
+						err = io.ErrUnexpectedEOF
+					}
+					return nil, fmt.Errorf("failed to read borrowed resource handle length byte: %w", err)
+				}
+				if b < 0x80 {
+					if i == 4 && b > 1 {
+						return nil, errors.New("borrowed resource handle length overflows a 32-bit integer")
+					}
+					x = x | uint32(b)<<s
+					buf := make([]byte, x)
+					slog.Debug("reading borrowed resource handle bytes", "len", x)
+					_, err = r.Read(buf)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read borrowed resource handle bytes: %w", err)
+					}
+					return wrpc.Borrow[UpsertResultAsync](buf), nil
+				}
+				x |= uint32(b&0x7f) << s
+				s += 7
+			}
+			return nil, errors.New("borrowed resource handle length overflows a 32-bit integer")
+		}(r)
+
+		if err != nil {
+			slog.WarnContext(ctx, "failed to read parameter", "i", 0, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+			if err := r.Close(); err != nil {
+				slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+			}
+			return
+		}
+		slog.DebugContext(ctx, "calling `wasmcloud:couchbase/document@0.1.0-draft.upsert-result-async.ready` handler")
+		r0, err := h.UpsertResultAsync_Ready(ctx, p0)
+		if cErr := r.Close(); cErr != nil {
+			slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+		}
+		if err != nil {
+			slog.WarnContext(ctx, "failed to handle invocation", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		writes := make(map[uint32]func(wrpc.IndexWriter) error, 1)
+
+		write0, err := (func(wrpc.IndexWriter) error)(nil), func(v bool, w io.ByteWriter) error {
+			if !v {
+				slog.Debug("writing `false` byte")
+				return w.WriteByte(0)
+			}
+			slog.Debug("writing `true` byte")
+			return w.WriteByte(1)
+		}(r0, &buf)
+		if err != nil {
+			slog.WarnContext(ctx, "failed to write result value", "i", 0, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+			return
+		}
+		if write0 != nil {
+			writes[0] = write0
+		}
+		slog.DebugContext(ctx, "transmitting `wasmcloud:couchbase/document@0.1.0-draft.upsert-result-async.ready` result")
+		_, err = w.Write(buf.Bytes())
+		if err != nil {
+			slog.WarnContext(ctx, "failed to write result", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+			return
+		}
+		if len(writes) > 0 {
+			for index, write := range writes {
+				_ = write
+				switch index {
+				case 0:
+					w, err := w.Index(0)
+					if err != nil {
+						slog.ErrorContext(ctx, "failed to index result writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+						return
+					}
+					write := write
+					go func() {
+						if err := write(w); err != nil {
+							slog.WarnContext(ctx, "failed to write nested result value", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.ready", "err", err)
+						}
+					}()
+				}
+			}
+		}
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.upsert-result-async.ready`: %w", err)
+	}
+	stops = append(stops, stop6)
+
+	stop7, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "upsert-result-async.get", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+		defer func() {
+			if err := w.Close(); err != nil {
+				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+			}
+		}()
+		slog.DebugContext(ctx, "reading parameter", "i", 0)
+		p0, err := func(r interface {
+			io.ByteReader
+			io.Reader
+		}) (wrpc.Borrow[UpsertResultAsync], error) {
+			var x uint32
+			var s uint
+			for i := 0; i < 5; i++ {
+				slog.Debug("reading borrowed resource handle length byte", "i", i)
+				b, err := r.ReadByte()
+				if err != nil {
+					if i > 0 && err == io.EOF {
+						err = io.ErrUnexpectedEOF
+					}
+					return nil, fmt.Errorf("failed to read borrowed resource handle length byte: %w", err)
+				}
+				if b < 0x80 {
+					if i == 4 && b > 1 {
+						return nil, errors.New("borrowed resource handle length overflows a 32-bit integer")
+					}
+					x = x | uint32(b)<<s
+					buf := make([]byte, x)
+					slog.Debug("reading borrowed resource handle bytes", "len", x)
+					_, err = r.Read(buf)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read borrowed resource handle bytes: %w", err)
+					}
+					return wrpc.Borrow[UpsertResultAsync](buf), nil
+				}
+				x |= uint32(b&0x7f) << s
+				s += 7
+			}
+			return nil, errors.New("borrowed resource handle length overflows a 32-bit integer")
+		}(r)
+
+		if err != nil {
+			slog.WarnContext(ctx, "failed to read parameter", "i", 0, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+			if err := r.Close(); err != nil {
+				slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+			}
+			return
+		}
+		slog.DebugContext(ctx, "calling `wasmcloud:couchbase/document@0.1.0-draft.upsert-result-async.get` handler")
+		r0, err := h.UpsertResultAsync_Get(ctx, p0)
+		if cErr := r.Close(); cErr != nil {
+			slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+		}
+		if err != nil {
+			slog.WarnContext(ctx, "failed to handle invocation", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		writes := make(map[uint32]func(wrpc.IndexWriter) error, 1)
+
+		write0, err := func(v *wrpc.Result[MutationMetadata, DocumentError], w interface {
+			io.ByteWriter
+			io.Writer
+		}) (func(wrpc.IndexWriter) error, error) {
+			switch {
+			case v.Ok == nil && v.Err == nil:
+				return nil, errors.New("both result variants cannot be nil")
+			case v.Ok != nil && v.Err != nil:
+				return nil, errors.New("exactly one result variant must non-nil")
+
+			case v.Ok != nil:
+				slog.Debug("writing `result::ok` status byte")
+				if err := w.WriteByte(0); err != nil {
+					return nil, fmt.Errorf("failed to write `result::ok` status byte: %w", err)
+				}
+				slog.Debug("writing `result::ok` payload")
+				write, err := (v.Ok).WriteToIndex(w)
+				if err != nil {
+					return nil, fmt.Errorf("failed to write `result::ok` payload: %w", err)
+				}
+				if write != nil {
+					return write, nil
+				}
+				return nil, nil
+			default:
+				slog.Debug("writing `result::err` status byte")
+				if err := w.WriteByte(1); err != nil {
+					return nil, fmt.Errorf("failed to write `result::err` status byte: %w", err)
+				}
+				slog.Debug("writing `result::err` payload")
+				write, err := (v.Err).WriteToIndex(w)
+				if err != nil {
+					return nil, fmt.Errorf("failed to write `result::err` payload: %w", err)
+				}
+				if write != nil {
+					return write, nil
+				}
+				return nil, nil
+			}
+		}(r0, &buf)
+		if err != nil {
+			slog.WarnContext(ctx, "failed to write result value", "i", 0, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+			return
+		}
+		if write0 != nil {
+			writes[0] = write0
+		}
+		slog.DebugContext(ctx, "transmitting `wasmcloud:couchbase/document@0.1.0-draft.upsert-result-async.get` result")
+		_, err = w.Write(buf.Bytes())
+		if err != nil {
+			slog.WarnContext(ctx, "failed to write result", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+			return
+		}
+		if len(writes) > 0 {
+			for index, write := range writes {
+				_ = write
+				switch index {
+				case 0:
+					w, err := w.Index(0)
+					if err != nil {
+						slog.ErrorContext(ctx, "failed to index result writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+						return
+					}
+					write := write
+					go func() {
+						if err := write(w); err != nil {
+							slog.WarnContext(ctx, "failed to write nested result value", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-result-async.get", "err", err)
+						}
+					}()
+				}
+			}
+		}
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.upsert-result-async.get`: %w", err)
+	}
+	stops = append(stops, stop7)
+
+	stop8, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "upsert-async", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+		defer func() {
+			if err := w.Close(); err != nil {
+				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			}
+		}()
+		slog.DebugContext(ctx, "reading parameter", "i", 0)
+		p0, err := func() (DocumentId, error) {
+			v, err := func() (wasmcloud__couchbase__types.DocumentId, error) {
+				v, err := func(r interface {
+					io.ByteReader
+					io.Reader
+				}) (string, error) {
+					var x uint32
+					var s uint8
+					for i := 0; i < 5; i++ {
+						slog.Debug("reading string length byte", "i", i)
+						b, err := r.ReadByte()
+						if err != nil {
+							if i > 0 && err == io.EOF {
+								err = io.ErrUnexpectedEOF
+							}
+							return "", fmt.Errorf("failed to read string length byte: %w", err)
+						}
+						if s == 28 && b > 0x0f {
+							return "", errors.New("string length overflows a 32-bit integer")
+						}
+						if b < 0x80 {
+							x = x | uint32(b)<<s
+							if x == 0 {
+								return "", nil
+							}
+							buf := make([]byte, x)
+							slog.Debug("reading string bytes", "len", x)
+							_, err = r.Read(buf)
+							if err != nil {
+								return "", fmt.Errorf("failed to read string bytes: %w", err)
+							}
+							if !utf8.Valid(buf) {
+								return string(buf), errors.New("string is not valid UTF-8")
+							}
+							return string(buf), nil
+						}
+						x |= uint32(b&0x7f) << s
+						s += 7
+					}
+					return "", errors.New("string length overflows a 32-bit integer")
+				}(r)
+				return (wasmcloud__couchbase__types.DocumentId)(v), err
+			}()
+
+			return (DocumentId)(v), err
+		}()
+
+		if err != nil {
+			slog.WarnContext(ctx, "failed to read parameter", "i", 0, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			if err := r.Close(); err != nil {
+				slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			}
+			return
+		}
+		slog.DebugContext(ctx, "reading parameter", "i", 1)
+		p1, err := func() (*Document, error) {
+			v, err := func(r wrpc.IndexReadCloser, path ...uint32) (*wasmcloud__couchbase__types.Document, error) {
+				v := &wasmcloud__couchbase__types.Document{}
+				n, err := func(r io.ByteReader) (uint8, error) {
+					var x uint8
+					var s uint
+					for i := 0; i < 2; i++ {
+						slog.Debug("reading u8 discriminant byte", "i", i)
+						b, err := r.ReadByte()
+						if err != nil {
+							if i > 0 && err == io.EOF {
+								err = io.ErrUnexpectedEOF
+							}
+							return x, fmt.Errorf("failed to read u8 discriminant byte: %w", err)
+						}
+						if s == 7 && b > 0x01 {
+							return x, errors.New("discriminant overflows an 8-bit integer")
+						}
+						if b < 0x80 {
+							return x | uint8(b)<<s, nil
+						}
+						x |= uint8(b&0x7f) << s
+						s += 7
+					}
+					return x, errors.New("discriminant overflows an 8-bit integer")
+				}(r)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read discriminant: %w", err)
+				}
+				switch wasmcloud__couchbase__types.DocumentDiscriminant(n) {
+				case wasmcloud__couchbase__types.DocumentRaw:
+					payload, err := func() (wasmcloud__couchbase__types.JsonString, error) {
+						v, err := func(r interface {
+							io.ByteReader
+							io.Reader
+						}) (string, error) {
+							var x uint32
+							var s uint8
+							for i := 0; i < 5; i++ {
+								slog.Debug("reading string length byte", "i", i)
+								b, err := r.ReadByte()
+								if err != nil {
+									if i > 0 && err == io.EOF {
+										err = io.ErrUnexpectedEOF
+									}
+									return "", fmt.Errorf("failed to read string length byte: %w", err)
+								}
+								if s == 28 && b > 0x0f {
+									return "", errors.New("string length overflows a 32-bit integer")
+								}
+								if b < 0x80 {
+									x = x | uint32(b)<<s
+									if x == 0 {
+										return "", nil
+									}
+									buf := make([]byte, x)
+									slog.Debug("reading string bytes", "len", x)
+									_, err = r.Read(buf)
+									if err != nil {
+										return "", fmt.Errorf("failed to read string bytes: %w", err)
+									}
+									if !utf8.Valid(buf) {
+										return string(buf), errors.New("string is not valid UTF-8")
+									}
+									return string(buf), nil
+								}
+								x |= uint32(b&0x7f) << s
+								s += 7
+							}
+							return "", errors.New("string length overflows a 32-bit integer")
+						}(r)
+						return (wasmcloud__couchbase__types.JsonString)(v), err
+					}()
+
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `raw` payload: %w", err)
+					}
+					return v.SetRaw(payload), nil
+				case wasmcloud__couchbase__types.DocumentResource:
+					payload, err := func(r interface {
+						io.ByteReader
+						io.Reader
+					}) (wrpc.Own[wasmcloud__couchbase__types.DocumentValue], error) {
+						var x uint32
+						var s uint
+						for i := 0; i < 5; i++ {
+							slog.Debug("reading owned resource handle length byte", "i", i)
+							b, err := r.ReadByte()
+							if err != nil {
+								if i > 0 && err == io.EOF {
+									err = io.ErrUnexpectedEOF
+								}
+								return nil, fmt.Errorf("failed to read owned resource handle length byte: %w", err)
+							}
+							if b < 0x80 {
+								if i == 4 && b > 1 {
+									return nil, errors.New("owned resource handle length overflows a 32-bit integer")
+								}
+								x = x | uint32(b)<<s
+								buf := make([]byte, x)
+								slog.Debug("reading owned resource handle bytes", "len", x)
+								_, err = r.Read(buf)
+								if err != nil {
+									return nil, fmt.Errorf("failed to read owned resource handle bytes: %w", err)
+								}
+								return wrpc.Own[wasmcloud__couchbase__types.DocumentValue](buf), nil
+							}
+							x |= uint32(b&0x7f) << s
+							s += 7
+						}
+						return nil, errors.New("owned resource handle length overflows a 32-bit integer")
+					}(r)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `resource` payload: %w", err)
+					}
+					return v.SetResource(payload), nil
+				default:
+					return nil, fmt.Errorf("unknown discriminant value %d", n)
+				}
+			}(r, []uint32{1}...)
+			return (*Document)(v), err
+		}()
+
+		if err != nil {
+			slog.WarnContext(ctx, "failed to read parameter", "i", 1, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			if err := r.Close(); err != nil {
+				slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			}
+			return
+		}
+		slog.DebugContext(ctx, "reading parameter", "i", 2)
+		p2, err := func(r wrpc.IndexReadCloser, path ...uint32) (*DocumentUpsertOptions, error) {
+			slog.Debug("reading option status byte")
+			status, err := r.ReadByte()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read option status byte: %w", err)
+			}
+			switch status {
+			case 0:
+				return nil, nil
+			case 1:
+				slog.Debug("reading `option::some` payload")
+				v, err := func(r wrpc.IndexReadCloser, path ...uint32) (*DocumentUpsertOptions, error) {
+					v := &DocumentUpsertOptions{}
+					var err error
+					slog.Debug("reading field", "name", "expires-in-ns")
+					v.ExpiresInNs, err = func(r io.ByteReader) (uint64, error) {
+						var x uint64
+						var s uint8
+						for i := 0; i < 10; i++ {
+							slog.Debug("reading u64 byte", "i", i)
+							b, err := r.ReadByte()
+							if err != nil {
+								if i > 0 && err == io.EOF {
+									err = io.ErrUnexpectedEOF
+								}
+								return x, fmt.Errorf("failed to read u64 byte: %w", err)
+							}
+							if s == 63 && b > 0x01 {
+								return x, errors.New("varint overflows a 64-bit integer")
+							}
+							if b < 0x80 {
+								return x | uint64(b)<<s, nil
+							}
+							x |= uint64(b&0x7f) << s
+							s += 7
+						}
+						return x, errors.New("varint overflows a 64-bit integer")
+					}(r)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `expires-in-ns` field: %w", err)
+					}
+					slog.Debug("reading field", "name", "preserve-expiry")
+					v.PreserveExpiry, err = func(r io.ByteReader) (bool, error) {
+						slog.Debug("reading bool byte")
+						v, err := r.ReadByte()
+						if err != nil {
+							slog.Debug("reading bool", "value", false)
+							return false, fmt.Errorf("failed to read bool byte: %w", err)
+						}
+						switch v {
+						case 0:
+							return false, nil
+						case 1:
+							return true, nil
+						default:
+							return false, fmt.Errorf("invalid bool value %d", v)
+						}
+					}(r)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `preserve-expiry` field: %w", err)
+					}
+					slog.Debug("reading field", "name", "persist-to")
+					v.PersistTo, err = func(r io.ByteReader) (uint64, error) {
+						var x uint64
+						var s uint8
+						for i := 0; i < 10; i++ {
+							slog.Debug("reading u64 byte", "i", i)
+							b, err := r.ReadByte()
+							if err != nil {
+								if i > 0 && err == io.EOF {
+									err = io.ErrUnexpectedEOF
+								}
+								return x, fmt.Errorf("failed to read u64 byte: %w", err)
+							}
+							if s == 63 && b > 0x01 {
+								return x, errors.New("varint overflows a 64-bit integer")
+							}
+							if b < 0x80 {
+								return x | uint64(b)<<s, nil
+							}
+							x |= uint64(b&0x7f) << s
+							s += 7
+						}
+						return x, errors.New("varint overflows a 64-bit integer")
+					}(r)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `persist-to` field: %w", err)
+					}
+					slog.Debug("reading field", "name", "replicate-to")
+					v.ReplicateTo, err = func(r io.ByteReader) (uint64, error) {
+						var x uint64
+						var s uint8
+						for i := 0; i < 10; i++ {
+							slog.Debug("reading u64 byte", "i", i)
+							b, err := r.ReadByte()
+							if err != nil {
+								if i > 0 && err == io.EOF {
+									err = io.ErrUnexpectedEOF
+								}
+								return x, fmt.Errorf("failed to read u64 byte: %w", err)
+							}
+							if s == 63 && b > 0x01 {
+								return x, errors.New("varint overflows a 64-bit integer")
+							}
+							if b < 0x80 {
+								return x | uint64(b)<<s, nil
+							}
+							x |= uint64(b&0x7f) << s
+							s += 7
+						}
+						return x, errors.New("varint overflows a 64-bit integer")
+					}(r)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `replicate-to` field: %w", err)
+					}
+					slog.Debug("reading field", "name", "durability-level")
+					v.DurabilityLevel, err = func() (DurabilityLevel, error) {
+						v, err := func(r io.ByteReader) (v wasmcloud__couchbase__types.DurabilityLevel, err error) {
+							n, err := func(r io.ByteReader) (uint8, error) {
+								var x uint8
+								var s uint
+								for i := 0; i < 2; i++ {
+									slog.Debug("reading u8 discriminant byte", "i", i)
+									b, err := r.ReadByte()
+									if err != nil {
+										if i > 0 && err == io.EOF {
+											err = io.ErrUnexpectedEOF
+										}
+										return x, fmt.Errorf("failed to read u8 discriminant byte: %w", err)
+									}
+									if s == 7 && b > 0x01 {
+										return x, errors.New("discriminant overflows an 8-bit integer")
+									}
+									if b < 0x80 {
+										return x | uint8(b)<<s, nil
+									}
+									x |= uint8(b&0x7f) << s
+									s += 7
+								}
+								return x, errors.New("discriminant overflows an 8-bit integer")
+							}(r)
+							if err != nil {
+								return v, fmt.Errorf("failed to read discriminant: %w", err)
+							}
+							switch wasmcloud__couchbase__types.DurabilityLevel(n) {
+							case wasmcloud__couchbase__types.DurabilityLevel_Unknown:
+								return wasmcloud__couchbase__types.DurabilityLevel_Unknown, nil
+							case wasmcloud__couchbase__types.DurabilityLevel_None:
+								return wasmcloud__couchbase__types.DurabilityLevel_None, nil
+							case wasmcloud__couchbase__types.DurabilityLevel_ReplicateMajority:
+								return wasmcloud__couchbase__types.DurabilityLevel_ReplicateMajority, nil
+							case wasmcloud__couchbase__types.DurabilityLevel_ReplicateMajorityPersistMaster:
+								return wasmcloud__couchbase__types.DurabilityLevel_ReplicateMajorityPersistMaster, nil
+							case wasmcloud__couchbase__types.DurabilityLevel_PersistMajority:
+								return wasmcloud__couchbase__types.DurabilityLevel_PersistMajority, nil
+							default:
+								return v, fmt.Errorf("unknown discriminant value %d", n)
+							}
+						}(r)
+						return (DurabilityLevel)(v), err
+					}()
+
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `durability-level` field: %w", err)
+					}
+					slog.Debug("reading field", "name", "timeout-ns")
+					v.TimeoutNs, err = func(r wrpc.IndexReadCloser, path ...uint32) (*uint64, error) {
+						slog.Debug("reading option status byte")
+						status, err := r.ReadByte()
+						if err != nil {
+							return nil, fmt.Errorf("failed to read option status byte: %w", err)
+						}
+						switch status {
+						case 0:
+							return nil, nil
+						case 1:
+							slog.Debug("reading `option::some` payload")
+							v, err := func(r io.ByteReader) (uint64, error) {
+								var x uint64
+								var s uint8
+								for i := 0; i < 10; i++ {
+									slog.Debug("reading u64 byte", "i", i)
+									b, err := r.ReadByte()
+									if err != nil {
+										if i > 0 && err == io.EOF {
+											err = io.ErrUnexpectedEOF
+										}
+										return x, fmt.Errorf("failed to read u64 byte: %w", err)
+									}
+									if s == 63 && b > 0x01 {
+										return x, errors.New("varint overflows a 64-bit integer")
+									}
+									if b < 0x80 {
+										return x | uint64(b)<<s, nil
+									}
+									x |= uint64(b&0x7f) << s
+									s += 7
+								}
+								return x, errors.New("varint overflows a 64-bit integer")
+							}(r)
+							if err != nil {
+								return nil, fmt.Errorf("failed to read `option::some` value: %w", err)
+							}
+							return &v, nil
+						default:
+							return nil, fmt.Errorf("invalid option status byte %d", status)
+						}
+					}(r, append(path, 5)...)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `timeout-ns` field: %w", err)
+					}
+					slog.Debug("reading field", "name", "retry-strategy")
+					v.RetryStrategy, err = func(r wrpc.IndexReadCloser, path ...uint32) (*RetryStrategy, error) {
+						slog.Debug("reading option status byte")
+						status, err := r.ReadByte()
+						if err != nil {
+							return nil, fmt.Errorf("failed to read option status byte: %w", err)
+						}
+						switch status {
+						case 0:
+							return nil, nil
+						case 1:
+							slog.Debug("reading `option::some` payload")
+							v, err := func() (*RetryStrategy, error) {
+								v, err := func(r wrpc.IndexReadCloser, path ...uint32) (*wasmcloud__couchbase__types.RetryStrategy, error) {
+									v := &wasmcloud__couchbase__types.RetryStrategy{}
+									n, err := func(r io.ByteReader) (uint8, error) {
+										var x uint8
+										var s uint
+										for i := 0; i < 2; i++ {
+											slog.Debug("reading u8 discriminant byte", "i", i)
+											b, err := r.ReadByte()
+											if err != nil {
+												if i > 0 && err == io.EOF {
+													err = io.ErrUnexpectedEOF
+												}
+												return x, fmt.Errorf("failed to read u8 discriminant byte: %w", err)
+											}
+											if s == 7 && b > 0x01 {
+												return x, errors.New("discriminant overflows an 8-bit integer")
+											}
+											if b < 0x80 {
+												return x | uint8(b)<<s, nil
+											}
+											x |= uint8(b&0x7f) << s
+											s += 7
+										}
+										return x, errors.New("discriminant overflows an 8-bit integer")
+									}(r)
+									if err != nil {
+										return nil, fmt.Errorf("failed to read discriminant: %w", err)
+									}
+									switch wasmcloud__couchbase__types.RetryStrategyDiscriminant(n) {
+									case wasmcloud__couchbase__types.RetryStrategyIntervalTimesMs:
+										payload, err := func(r wrpc.IndexReadCloser, path ...uint32) (*wrpc.Tuple2[uint64, uint64], error) {
+											v := &wrpc.Tuple2[uint64, uint64]{}
+											var err error
+											slog.Debug("reading tuple element 0")
+											v.V0, err = func(r io.ByteReader) (uint64, error) {
+												var x uint64
+												var s uint8
+												for i := 0; i < 10; i++ {
+													slog.Debug("reading u64 byte", "i", i)
+													b, err := r.ReadByte()
+													if err != nil {
+														if i > 0 && err == io.EOF {
+															err = io.ErrUnexpectedEOF
+														}
+														return x, fmt.Errorf("failed to read u64 byte: %w", err)
+													}
+													if s == 63 && b > 0x01 {
+														return x, errors.New("varint overflows a 64-bit integer")
+													}
+													if b < 0x80 {
+														return x | uint64(b)<<s, nil
+													}
+													x |= uint64(b&0x7f) << s
+													s += 7
+												}
+												return x, errors.New("varint overflows a 64-bit integer")
+											}(r)
+											if err != nil {
+												return nil, fmt.Errorf("failed to read tuple element 0: %w", err)
+											}
+											slog.Debug("reading tuple element 1")
+											v.V1, err = func(r io.ByteReader) (uint64, error) {
+												var x uint64
+												var s uint8
+												for i := 0; i < 10; i++ {
+													slog.Debug("reading u64 byte", "i", i)
+													b, err := r.ReadByte()
+													if err != nil {
+														if i > 0 && err == io.EOF {
+															err = io.ErrUnexpectedEOF
+														}
+														return x, fmt.Errorf("failed to read u64 byte: %w", err)
+													}
+													if s == 63 && b > 0x01 {
+														return x, errors.New("varint overflows a 64-bit integer")
+													}
+													if b < 0x80 {
+														return x | uint64(b)<<s, nil
+													}
+													x |= uint64(b&0x7f) << s
+													s += 7
+												}
+												return x, errors.New("varint overflows a 64-bit integer")
+											}(r)
+											if err != nil {
+												return nil, fmt.Errorf("failed to read tuple element 1: %w", err)
+											}
+											return v, nil
+										}(r, path...)
+										if err != nil {
+											return nil, fmt.Errorf("failed to read `interval-times-ms` payload: %w", err)
+										}
+										return v.SetIntervalTimesMs(payload), nil
+									default:
+										return nil, fmt.Errorf("unknown discriminant value %d", n)
+									}
+								}(r, path...)
+								return (*RetryStrategy)(v), err
+							}()
+
+							if err != nil {
+								return nil, fmt.Errorf("failed to read `option::some` value: %w", err)
+							}
+							return v, nil
+						default:
+							return nil, fmt.Errorf("invalid option status byte %d", status)
+						}
+					}(r, append(path, 6)...)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `retry-strategy` field: %w", err)
+					}
+					slog.Debug("reading field", "name", "parent-span")
+					v.ParentSpan, err = func(r wrpc.IndexReadCloser, path ...uint32) (*RequestSpan, error) {
+						slog.Debug("reading option status byte")
+						status, err := r.ReadByte()
+						if err != nil {
+							return nil, fmt.Errorf("failed to read option status byte: %w", err)
+						}
+						switch status {
+						case 0:
+							return nil, nil
+						case 1:
+							slog.Debug("reading `option::some` payload")
+							v, err := func() (RequestSpan, error) {
+								v, err := func() (wasmcloud__couchbase__types.RequestSpan, error) {
+									v, err := func(r interface {
+										io.ByteReader
+										io.Reader
+									}) (string, error) {
+										var x uint32
+										var s uint8
+										for i := 0; i < 5; i++ {
+											slog.Debug("reading string length byte", "i", i)
+											b, err := r.ReadByte()
+											if err != nil {
+												if i > 0 && err == io.EOF {
+													err = io.ErrUnexpectedEOF
+												}
+												return "", fmt.Errorf("failed to read string length byte: %w", err)
+											}
+											if s == 28 && b > 0x0f {
+												return "", errors.New("string length overflows a 32-bit integer")
+											}
+											if b < 0x80 {
+												x = x | uint32(b)<<s
+												if x == 0 {
+													return "", nil
+												}
+												buf := make([]byte, x)
+												slog.Debug("reading string bytes", "len", x)
+												_, err = r.Read(buf)
+												if err != nil {
+													return "", fmt.Errorf("failed to read string bytes: %w", err)
+												}
+												if !utf8.Valid(buf) {
+													return string(buf), errors.New("string is not valid UTF-8")
+												}
+												return string(buf), nil
+											}
+											x |= uint32(b&0x7f) << s
+											s += 7
+										}
+										return "", errors.New("string length overflows a 32-bit integer")
+									}(r)
+									return (wasmcloud__couchbase__types.RequestSpan)(v), err
+								}()
+
+								return (RequestSpan)(v), err
+							}()
+
+							if err != nil {
+								return nil, fmt.Errorf("failed to read `option::some` value: %w", err)
+							}
+							return &v, nil
+						default:
+							return nil, fmt.Errorf("invalid option status byte %d", status)
+						}
+					}(r, append(path, 7)...)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read `parent-span` field: %w", err)
+					}
+					return v, nil
+				}(r, path...)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read `option::some` value: %w", err)
+				}
+				return v, nil
+			default:
+				return nil, fmt.Errorf("invalid option status byte %d", status)
+			}
+		}(r, []uint32{2}...)
+
+		if err != nil {
+			slog.WarnContext(ctx, "failed to read parameter", "i", 2, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			if err := r.Close(); err != nil {
+				slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			}
+			return
+		}
+		slog.DebugContext(ctx, "calling `wasmcloud:couchbase/document@0.1.0-draft.upsert-async` handler")
+		r0, err := h.UpsertAsync(ctx, p0, p1, p2)
+		if cErr := r.Close(); cErr != nil {
+			slog.ErrorContext(ctx, "failed to close reader", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+		}
+		if err != nil {
+			slog.WarnContext(ctx, "failed to handle invocation", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		writes := make(map[uint32]func(wrpc.IndexWriter) error, 1)
+
+		write0, err := (func(wrpc.IndexWriter) error)(nil), func(v string, w io.Writer) (err error) {
+			n := len(v)
+			if n > math.MaxUint32 {
+				return fmt.Errorf("string byte length of %d overflows a 32-bit integer", n)
+			}
+			if err = func(v int, w io.Writer) error {
+				b := make([]byte, binary.MaxVarintLen32)
+				i := binary.PutUvarint(b, uint64(v))
+				slog.Debug("writing string byte length", "len", n)
+				_, err = w.Write(b[:i])
+				return err
+			}(n, w); err != nil {
+				return fmt.Errorf("failed to write string byte length of %d: %w", n, err)
+			}
+			slog.Debug("writing string bytes")
+			_, err = w.Write([]byte(v))
+			if err != nil {
+				return fmt.Errorf("failed to write string bytes: %w", err)
+			}
+			return nil
+		}(string(r0), &buf)
+		if err != nil {
+			slog.WarnContext(ctx, "failed to write result value", "i", 0, "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			return
+		}
+		if write0 != nil {
+			writes[0] = write0
+		}
+		slog.DebugContext(ctx, "transmitting `wasmcloud:couchbase/document@0.1.0-draft.upsert-async` result")
+		_, err = w.Write(buf.Bytes())
+		if err != nil {
+			slog.WarnContext(ctx, "failed to write result", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+			return
+		}
+		if len(writes) > 0 {
+			for index, write := range writes {
+				_ = write
+				switch index {
+				case 0:
+					w, err := w.Index(0)
+					if err != nil {
+						slog.ErrorContext(ctx, "failed to index result writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+						return
+					}
+					write := write
+					go func() {
+						if err := write(w); err != nil {
+							slog.WarnContext(ctx, "failed to write nested result value", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "upsert-async", "err", err)
+						}
+					}()
+				}
+			}
+		}
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.upsert-async`: %w", err)
+	}
+	stops = append(stops, stop8)
+
+	stop9, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get", "err", err)
@@ -6295,9 +7234,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get`: %w", err)
 	}
-	stops = append(stops, stop6)
+	stops = append(stops, stop9)
 
-	stop7, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-result-async.ready", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop10, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-result-async.ready", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get-result-async.ready", "err", err)
@@ -6402,9 +7341,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get-result-async.ready`: %w", err)
 	}
-	stops = append(stops, stop7)
+	stops = append(stops, stop10)
 
-	stop8, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-result-async.get", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop11, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-result-async.get", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get-result-async.get", "err", err)
@@ -6541,9 +7480,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get-result-async.get`: %w", err)
 	}
-	stops = append(stops, stop8)
+	stops = append(stops, stop11)
 
-	stop9, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-async", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop12, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-async", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get-async", "err", err)
@@ -7126,9 +8065,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get-async`: %w", err)
 	}
-	stops = append(stops, stop9)
+	stops = append(stops, stop12)
 
-	stop10, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-any-repliacs", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop13, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-any-repliacs", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get-any-repliacs", "err", err)
@@ -7551,9 +8490,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get-any-repliacs`: %w", err)
 	}
-	stops = append(stops, stop10)
+	stops = append(stops, stop13)
 
-	stop11, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-all-replicas", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop14, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-all-replicas", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get-all-replicas", "err", err)
@@ -8031,9 +8970,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get-all-replicas`: %w", err)
 	}
-	stops = append(stops, stop11)
+	stops = append(stops, stop14)
 
-	stop12, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "remove", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop15, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "remove", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "remove", "err", err)
@@ -8587,9 +9526,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.remove`: %w", err)
 	}
-	stops = append(stops, stop12)
+	stops = append(stops, stop15)
 
-	stop13, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-and-lock", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop16, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-and-lock", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get-and-lock", "err", err)
@@ -9039,9 +9978,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get-and-lock`: %w", err)
 	}
-	stops = append(stops, stop13)
+	stops = append(stops, stop16)
 
-	stop14, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "unlock", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop17, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "unlock", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "unlock", "err", err)
@@ -9483,9 +10422,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.unlock`: %w", err)
 	}
-	stops = append(stops, stop14)
+	stops = append(stops, stop17)
 
-	stop15, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "touch", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop18, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "touch", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "touch", "err", err)
@@ -9935,9 +10874,9 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.touch`: %w", err)
 	}
-	stops = append(stops, stop15)
+	stops = append(stops, stop18)
 
-	stop16, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-and-touch", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
+	stop19, err := s.Serve("wasmcloud:couchbase/document@0.1.0-draft", "get-and-touch", func(ctx context.Context, w wrpc.IndexWriteCloser, r wrpc.IndexReadCloser) {
 		defer func() {
 			if err := w.Close(); err != nil {
 				slog.DebugContext(ctx, "failed to close writer", "instance", "wasmcloud:couchbase/document@0.1.0-draft", "name", "get-and-touch", "err", err)
@@ -10387,6 +11326,6 @@ func ServeInterface(s wrpc.Server, h Handler) (stop func() error, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to serve `wasmcloud:couchbase/document@0.1.0-draft.get-and-touch`: %w", err)
 	}
-	stops = append(stops, stop16)
+	stops = append(stops, stop19)
 	return stop, nil
 }

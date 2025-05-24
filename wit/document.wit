@@ -165,6 +165,18 @@ interface document {
     options: option<document-upsert-options>,
   ) -> result<mutation-metadata, document-error>;
 
+  resource upsert-result-async {
+    ready: func() -> bool;
+
+    get: func() -> result<mutation-metadata, document-error>;
+  }
+
+  upsert-async: func(
+    id: document-id,
+    doc: document,
+    options: option<document-upsert-options>,
+  ) -> upsert-result-async;
+
   //////////////////////
   /// Document - Get ///
   //////////////////////

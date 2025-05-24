@@ -42,7 +42,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 	res := []timeResult{}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -74,7 +74,7 @@ func CouchbaseSomeStuff(id string, index int) error {
 	documentId := types.DocumentID(fmt.Sprintf("%s.%d", id, index))
 
 	// Insert document
-	insertResult := document.InsertAsync(documentId, types.DocumentRaw(types.JSONString("Hello World")), cm.None[document.DocumentInsertOptions]())
+	insertResult := document.UpsertAsync(documentId, types.DocumentRaw(types.JSONString("Hello World")), cm.None[document.DocumentUpsertOptions]())
 	_, Err, isErr := Await(insertResult).Result()
 	if isErr {
 		return errors.New(Err.String())

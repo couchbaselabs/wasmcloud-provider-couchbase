@@ -119,3 +119,26 @@ func (h *Handler) GetResultAsync_Ready(ctx__ context.Context, self wrpc.Borrow[d
 func (h *Handler) GetResultAsync_Get(ctx__ context.Context, self wrpc.Borrow[document.GetResultAsync]) (*wrpc.Result[document.DocumentGetResult, document.DocumentError], error) {
 	return Result[*wrpc.Result[document.DocumentGetResult, document.DocumentError]](&h.asyncMap, string(self))
 }
+
+func (h *Handler) UpsertAsync(ctx context.Context, id string, doc *types.Document, options *document.DocumentUpsertOptions) (wrpc.Own[document.UpsertResultAsync], error) {
+	asyncKey, err := HandleAsyncResult(&h.asyncMap, func() *wrpc.Result[document.MutationMetadata, document.DocumentError] {
+		res, err := h.Upsert(ctx, id, doc, options)
+		if err != nil {
+			h.Logger.Error("Error InsertAsync failed", "error", err)
+			return Err[types.MutationMetadata](*types.NewDocumentErrorNotFound())
+		}
+		return res
+	})
+	if err != nil {
+		return nil, err
+	}
+	return wrpc.Own[document.UpsertResultAsync](asyncKey), nil
+}
+
+func (h *Handler) UpsertResultAsync_Ready(ctx__ context.Context, self wrpc.Borrow[document.UpsertResultAsync]) (bool, error) {
+	return IsReady[*wrpc.Result[document.MutationMetadata, document.DocumentError]](&h.asyncMap, string(self))
+}
+
+func (h *Handler) UpsertResultAsync_Get(ctx__ context.Context, self wrpc.Borrow[document.UpsertResultAsync]) (*wrpc.Result[document.MutationMetadata, document.DocumentError], error) {
+	return Result[*wrpc.Result[document.MutationMetadata, document.DocumentError]](&h.asyncMap, string(self))
+}
