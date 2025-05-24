@@ -4,20 +4,32 @@ package main
 
 import (
 	"encoding/json"
-	"io"
+	"errors"
+	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/bytecodealliance/wasm-tools-go/cm"
 	"github.com/couchbaselabs/wasmcloud-provider-couchbase/components/golang/gen/wasmcloud/couchbase/document"
 	"github.com/couchbaselabs/wasmcloud-provider-couchbase/components/golang/gen/wasmcloud/couchbase/types"
 	"github.com/julienschmidt/httprouter"
+	"go.wasmcloud.dev/component/log/wasilog"
 	"go.wasmcloud.dev/component/net/wasihttp"
 )
+
+var logger = wasilog.DefaultLogger
 
 func init() {
 	router := httprouter.New()
 	router.POST("/:document_id", handleRequest)
 	wasihttp.Handle(router)
+}
+
+type timeResult struct {
+	Start   int64 `json:"start"`
+	End     int64 `json:"end"`
+	Elapsed int64 `json:"elapsed"`
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -26,44 +38,56 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ps httprouter.Params)
 	if len(documentIdParameter) == 0 {
 		documentIdParameter = "demodoc"
 	}
-	docId := types.DocumentID(documentIdParameter)
 
-	// Get document body
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "Unable to read http body",
-		})
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	res := []timeResult{}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			start := time.Now()
+			err := CouchbaseSomeStuff(documentIdParameter, i)
+			if err != nil {
+				logger.Error("error", "error", err)
+			}
+			end := time.Now()
+			res = append(res, timeResult{
+				Start:   start.UnixMicro(),
+				End:     end.UnixMicro(),
+				Elapsed: end.Sub(start).Microseconds(),
+			})
+		}()
 	}
-	doc := types.DocumentRaw(types.JSONString(data))
+	wg.Wait()
 
-	// Upsert document
-	upsertResult := document.Upsert(docId, doc, cm.Option[document.DocumentUpsertOptions]{})
-	if upsertResult.IsErr() {
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "Failed to upsert document",
-			"error":   upsertResult.Err().String(),
-		})
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		logger.Error("failed to encode response body", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+	}
+}
+
+func CouchbaseSomeStuff(id string, index int) error {
+	documentId := types.DocumentID(fmt.Sprintf("%s.%d", id, index))
+
+	// Insert document
+	insertResult := document.InsertAsync(documentId, types.DocumentRaw(types.JSONString("Hello World")), cm.None[document.DocumentInsertOptions]())
+	_, Err, isErr := Await(insertResult).Result()
+	if isErr {
+		return errors.New(Err.String())
 	}
 
 	// Get document
-	getResult := document.Get(docId, cm.Option[document.DocumentGetOptions]{})
-	if getResult.IsErr() {
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "Failed to get document",
-			"error":   getResult.Err().String(),
-		})
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	getResult := document.GetAsync(documentId, cm.None[document.DocumentGetOptions]())
+	getDoc, Err, isErr := Await(getResult).Result()
+	if isErr {
+		return errors.New(Err.String())
 	}
-
-	// Write HTTP response
-	w.Write([]byte(*getResult.OK().Document.Raw()))
-	w.WriteHeader(http.StatusOK)
+	logger.Info("CouchbaseSomeStuff", "document", *getDoc.Document.Raw(), "index", index)
+	return nil
 }
 
 //go:generate go run github.com/bytecodealliance/wasm-tools-go/cmd/wit-bindgen-go generate --world hello --out gen ./wit
